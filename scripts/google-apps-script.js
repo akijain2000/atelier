@@ -82,7 +82,10 @@ function onFormSubmit(e) {
       method: 'post',
       contentType: 'application/json',
       payload: bodyStr,
-      headers: { 'X-Webhook-Signature': signature },
+      headers: {
+        'X-Webhook-Signature': signature,
+        'X-Webhook-Token': webhookSecret,
+      },
       muteHttpExceptions: true,
     });
 
@@ -169,7 +172,10 @@ function backfillExistingRows() {
         method: 'post',
         contentType: 'application/json',
         payload: bodyStr,
-        headers: { 'X-Webhook-Signature': signature },
+        headers: {
+          'X-Webhook-Signature': signature,
+          'X-Webhook-Token': webhookSecret,
+        },
         muteHttpExceptions: true,
       });
 
