@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: atelier
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-20250514
+      - key: DEFAULT_PROVIDER
+        value: anthropic
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: STAYPORTAL_EMAIL
+        sync: false
+      - key: STAYPORTAL_PASSWORD
+        sync: false
