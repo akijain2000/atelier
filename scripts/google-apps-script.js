@@ -5,7 +5,7 @@
  * 1. Open Google Sheets → Extensions → Apps Script
  * 2. Paste this entire file into Code.gs
  * 3. Set Script Properties (Project Settings → Script Properties):
- *    - ATELIER_WEBHOOK_URL = https://your-atelier-domain.com/api/leads/ingest
+ *    - ATELIER_WEBHOOK_URL = https://atelier-3phm.onrender.com/api/leads/ingest
  *    - ATELIER_WEBHOOK_SECRET = (same value as WEBHOOK_SECRET in Atelier .env)
  *    - ATELIER_LISTING_ID = N94_3ROMS (or whichever listing this form is for)
  * 4. Add trigger: onFormSubmit → From spreadsheet → On form submit
