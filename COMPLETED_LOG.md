@@ -421,9 +421,401 @@ Tested the complete flow with a realistic Finn.no tenant inquiry against the liv
 - Frontend: Vite 7.3.1 on port 5174, proxying to Node.js on port 3001
 - Server logs: Clean, zero errors during entire test
 
-### What's Next
+---
 
-- Create 2-3 additional listing data files for real N94 units
-- Deploy to Render
-- Run the V5 Finn prompt evaluation (5 test conversations)
-- Run the Lead Scoring prompt evaluation (4 examples from the prompt)
+## Deployment & Production (2026-04-01)
+
+**Goal:** Ship Atelier to production. Get a live URL that stakeholders can test. Run post-deploy verification and security audit.
+
+### What Was Done
+
+#### 1. Code Quality Check (`/health`)
+
+Ran a health check before shipping:
+- **Build:** `npm run build` passes cleanly. Vite 7.3.1, 34 modules, 991ms build time. Output: 206KB JS (65KB gzipped), 11KB CSS (2.8KB gzipped).
+- **Dependencies:** `npm audit` — 0 vulnerabilities across 226 packages.
+- **Security:** Created `.gitignore` (was missing) to exclude `.env`, `node_modules/`, `dist/`, and log files.
+
+#### 2. Git Init & Push (`/ship`)
+
+- Initialized git repo in `atelier/`
+- Created initial commit: `feat: Atelier MVP — tenant chat + lead scoring`
+- Pushed to `https://github.com/akijain2000/atelier` (private repo)
+- **Issue encountered:** GitHub Push Protection blocked the initial push because `.env.example` contained a real Anthropic API key. Fixed by replacing with placeholder `sk-ant-api03-your-key-here`, amended the commit, and force-pushed.
+
+#### 3. Render Deployment Configuration
+
+Created `render.yaml` for Render's Infrastructure as Code:
+```yaml
+services:
+  - type: web
+    name: atelier
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL / ANTHROPIC_API_KEY / SUPABASE_URL / SUPABASE_ANON_KEY / STAYPORTAL_EMAIL / STAYPORTAL_PASSWORD
+        sync: false  (set manually in Render dashboard)
+```
+
+Created `CLAUDE.md` with project context, deploy config, and health stack for gstack integration.
+
+#### 4. Render Deployment
+
+- Created web service on Render via the dashboard (automated by browser)
+- Source: `akijain2000/atelier` (public git repo tab, since Git Provider was connected to a different account)
+- Configured: Node runtime, `main` branch, Free tier ($0/month, 512MB RAM, 0.1 CPU)
+- Set all 6 environment variables via the Render dashboard
+- Build completed in ~20 seconds. Server started on port 10000.
+- **Production URL:** `https://atelier-3phm.onrender.com`
+
+**Why Render Free tier:** This is a prototype/demo deployment. Free tier spins down after inactivity (50s cold start), but that's acceptable for stakeholder demos. Upgrade to Starter ($7/month) when sharing with real property managers.
+
+#### 5. Post-Deploy: Repo Made Private
+
+Changed the GitHub repo visibility from public to private using `gh repo edit --visibility private`. The Render deployment continues to work since it cloned via public git URL (the code is already deployed).
+
+#### 6. Post-Deploy: Canary Health Check
+
+Verified production health immediately after deploy:
+
+| Endpoint | HTTP | Status |
+|----------|------|--------|
+| `/` | 200 | Title: "Atelier — Tenant Chat & Lead Scoring", 3-column layout renders correctly |
+| `/api/health` | 200 | `{"ok":true, "activeProvider":"anthropic", "activeModel":"claude-sonnet-4-20250514", "hasApiKey":true}` |
+| `/api/conversations` | 200 | Returns JSON array |
+
+Console errors from Atelier: **0**. All errors in console log were from Render dashboard pages (Apollo/Intercom), not from Atelier itself.
+
+**Verdict: DEPLOY IS HEALTHY**
+
+#### 7. Post-Deploy: CSO Security Audit
+
+Full security audit (daily mode, 8/10 confidence gate). 10 findings:
+
+| # | Sev | Conf | Finding |
+|---|-----|------|---------|
+| 1 | CRIT | 10/10 | No authentication on any API endpoint — all data and LLM operations accessible to anyone with the URL |
+| 2 | CRIT | 10/10 | System prompt read/write (`GET/PUT /api/system-prompt`) open to anyone — attacker can overwrite prompt |
+| 3 | HIGH | 10/10 | `/api/chat` accepts caller-controlled `systemPrompt` in request body — arbitrary prompt + your API key |
+| 4 | HIGH | 9/10 | `listing_id` path traversal — `path.join(listingsDir, listingId + '.md')` without sanitizing `..` |
+| 5 | HIGH | 9/10 | Client can set `role: 'admin'` on messages — server trusts the body value |
+| 6 | HIGH | 9/10 | No rate limits on LLM-backed routes — attacker can burn through Anthropic API budget |
+| 7 | HIGH | 9/10 | `COMPLETED_LOG.md` contains `STAYPORTAL_PASSWORD` in plaintext (tracked in git) |
+| 8 | MED | 8/10 | `/api/health` leaks runtime config (active provider, model, prompt paths) — reconnaissance vector |
+| 9 | MED | 8/10 | CORS set to `*` (any origin) — combined with no auth, allows any website to call the API |
+| 10 | MED | 8/10 | MCP tool calls influenced by tenant chat context — prompt injection could surface sensitive tool output |
+
+**What passed:** SQL queries use parameterized `$1` placeholders (no injection). React renders safely (no `dangerouslySetInnerHTML`). Dependencies have 0 CVEs. `.env` is properly gitignored. `render.yaml` uses `sync: false` for secrets.
+
+**Recommended fix priority:** Auth → prompt API lockdown → `listing_id` allowlist → rate limits → redact credentials from docs → restrict CORS.
+
+**Note:** The repo being private mitigates immediate exposure. Items 1-2 are blockers before sharing the URL with external users.
+
+### Architecture Decisions
+
+1. **Free tier for prototype:** Acceptable 50s cold start for demo purposes. Upgrade path is clear (Starter $7/month for always-on).
+2. **Public git repo for deploy, then private:** Render cloned via public URL during deploy setup. Making it private after doesn't break the existing deployment (code already deployed), but future deploys from the dashboard may need the Git Provider connected. Can add `akijain2000` to Render Git Provider if needed.
+3. **No auth for MVP:** Intentional trade-off for Day 1-3 velocity. Auth is the top priority for Day 4 before sharing with real property managers.
+
+### Files Added/Changed
+
+```
+atelier/
+  .gitignore          (new — excludes .env, node_modules/, dist/, logs)
+  render.yaml         (new — Render IaC: web service, free tier, env vars, health check)
+  CLAUDE.md           (new — gstack project context and deploy config)
+  .env.example        (changed — replaced real API key with placeholder)
+  COMPLETED_LOG.md    (updated — added deployment and security audit sections)
+```
+
+---
+
+## Atelier V2 Planning (2026-04-01)
+
+### Product Pivot
+
+Atelier is being transformed from a web chat sandbox (where PM types as tenant) into a production outbound tenant engagement system:
+
+- **Tenants interact via SMS only** (never see a web UI)
+- **PM dashboard** for management (attention queue, conversation threads, scoring, override)
+- **Google Sheet form** triggers lead creation and first outbound message
+- **Channel-agnostic architecture** (SMS via Pling first, extensible to WhatsApp/email)
+- **Haiku for chat** (3.75x cost reduction), Sonnet for scoring
+- **Incremental frontend migration** (strangler pattern, not big-bang rewrite)
+
+### /autoplan Review
+
+Ran full CEO + Design + Eng review pipeline with dual voices. Key outcomes:
+
+1. **Auth moved to Phase 0** -- prerequisite before any SMS with real phone numbers
+2. **Channel-agnostic messaging** -- `lib/channels/` adapter pattern, not SMS-only
+3. **Templated first messages** -- approved templates with AI-filled slots, not free-form
+4. **Strangler frontend** -- 4 incremental steps instead of full rewrite
+5. **Listing snapshots** -- cached per conversation, not re-fetched from MCP per message
+6. **Consent + STOP handling** -- Google Form consent checkbox, keyword opt-out
+7. **Transactional outbox** -- state machine for message delivery, not fire-and-forget
+8. **E.164 + idempotency** -- phone normalization, webhook dedupe
+
+### Decisions
+
+1. **SMS Provider:** Pling (Front Information AS) -- Norwegian gateway, 0.39-0.55 NOK/msg, direct carrier routes
+2. **Google Sheet:** "Lead skjema" form with 7 fields (name, age, email, phone, move-in date, status, intro). Need to add consent checkbox.
+3. **Model split:** Haiku for chat ($0.80/$4.00 per M tokens), Sonnet for scoring ($3/$15)
+4. **Frontend strategy:** Strangler pattern -- add new components alongside existing UI, migrate incrementally
+
+### Completed
+
+- **Phase 0:** Auth + security foundation -- JWT auth, login/register/logout, requireAuth middleware, rate limiting (express-rate-limit), CORS lockdown, audit_log table, pm_users table. Tested: 8/8 tests passed, 5 audit events logged.
+- **Phase 1A:** Model split -- chat defaults to Haiku 4.5 (`claude-haiku-4-5-20251001`), scoring stays on Sonnet 4. Env vars: `ANTHROPIC_CHAT_MODEL`, `ANTHROPIC_SCORING_MODEL`. Tested with live chat.
+- **Phase 1B:** Channel-agnostic messaging -- `lib/channels/` with `types.js`, `sms.js` (Pling adapter), `index.js` (registry). Inbound SMS webhook (`POST /api/channels/sms/inbound`), outbound SMS endpoint (`POST /api/channels/sms/send`), opt-out/STOP handling, idempotency on Pling message ID, E.164 normalization. DB migrations: phone, email, age, flow_state, channel, delivery_status, external_id columns. Tested: 7/7 tests passed.
+- **Phase 1C:** Lead ingestion -- `POST /api/leads/ingest` (HMAC-verified webhook). Preliminary AI scoring gate using Sonnet. Configurable `LEAD_SCORE_THRESHOLD` (default 40). Leads scoring above threshold advance to `pending_compose`, below to `filtered`. Idempotency on row_id+timestamp. Dedupe on phone+listing. Tested: 8/8 tests passed (22yo UiB student scored 95 → pending_compose, "Unknown" scored 0 → filtered).
+- **Phase 1D:** Templated first message -- `prompts/templates/first_message.json` (NO/EN). Auto-compose and send on lead ingestion when score passes. PM endpoints: `POST /api/leads/:id/send-first` (manual trigger), `POST /api/leads/:id/override` (push filtered lead into pipeline). Flow state rollback on send failure. Tested with Pling creds not configured (graceful failure + rollback).
+- **Phase 1E:** SMS-context prompts -- Updated `Prompt.md` with SMS channel constraints (320/480 char limits), `{{TENANT_PROFILE}}` injection, `{{FLOW_STATE}}` injection, `{{CALENDLY_URL}}` injection, flow state behavioral instructions, Calendly as primary CTA. Added `stripMarkdown()` post-processor for SMS-clean output. Updated `buildSystemPrompt()` to inject conversation context. Tested: "Kan jeg ha hund?" → 44 chars, no markdown.
+
+### Phase 2: PM Dashboard (completed)
+
+**Goal:** Replace the old web chat sandbox UI with a production PM dashboard for managing tenant conversations, scores, and flow states.
+
+#### What Was Built
+
+**Frontend Authentication (`src/lib/auth.js`):**
+- JWT token management (localStorage) with `getToken`, `setToken`, `clearToken`
+- `apiFetch` wrapper that auto-attaches JWT and redirects to `/login` on 401
+
+**Login Page (`src/pages/Login.jsx`):**
+- Email/password login form, stores JWT, navigates to dashboard on success
+
+**Dashboard Layout (`src/pages/Dashboard.jsx`):**
+- Sidebar navigation: Attention Queue, Filtered Leads, All Conversations
+- User session management via `/api/auth/me`, logout via `/api/auth/logout`
+- Active nav link highlighting with `react-router-dom` `NavLink`
+
+**Attention Queue (`src/components/AttentionQueue.jsx`):**
+- Filters conversations by actionable flow states (`pending_compose`, `first_message_sent`, `has_questions`, `wants_to_rent`, `soft_commitment`, `confirmed`, `wants_physical`, `manual_intervention`)
+- Sorted by `updated_at` (most recent first)
+
+**Filtered Leads (`src/components/FilteredLeads.jsx`):**
+- Shows leads with `flow_state = 'filtered'`, sorted by `preliminary_score`
+- Grouped by month with section headers
+- "Push to Pipeline" button calls `POST /api/leads/:id/override` → changes state to `pending_compose`
+
+**All Conversations (`src/components/AllConversations.jsx`):**
+- Lists all conversations with 6-column grid (tenant, phone, status, score, messages, updated)
+- Click to navigate to conversation detail view
+
+**Conversation View (`src/pages/ConversationView.jsx`):**
+- Message thread: tenant (left/dark), AI/PM (right/gold) bubbles with channel and delivery status badges
+- PM composer: textarea with character count, SMS segment preview, "Send via AI" and "Send SMS" buttons
+- "Take Over" button (sets `flow_state = 'pm_takeover'`), "Re-enable AI" button (sets back to `has_questions`)
+- Tenant Profile card: name, phone, email, age, status, move-in, intro
+- Flow State card: current state badge, preliminary score, details (source, message count, created date)
+
+**Flow Badge (`src/components/FlowBadge.jsx`):**
+- Reusable colored badge mapping 20 flow states to labels and color classes
+
+**Routing (`src/main.jsx`):**
+- `react-router-dom` with `RequireAuth` wrapper for protected routes
+- Routes: `/login`, `/` (attention queue), `/filtered`, `/all`, `/conversation/:id`
+
+**Backend Addition:**
+- `PATCH /api/conversations/:id` endpoint for updating `flow_state` (PM takeover, re-enable AI)
+- Audit logging for all state changes
+
+#### Phase 2D: Old UI Retirement
+
+Deleted 6 dead files (old web chat sandbox components):
+- `App.jsx` (6KB), `ChatPanel.jsx` (4KB), `ConversationList.jsx` (3KB)
+- `ListingSelector.jsx` (1KB), `ScoringSidebar.jsx` (5KB), `MarkdownText.jsx` (2KB)
+
+Removed ~730 lines of dead CSS from `styles.css` (old 3-column layout, scoring sidebar, conversation sidebar, chat panel, sub-score rows, old responsive breakpoints).
+
+Kept: `.brand-badge`, `.brand-title` (shared by new dashboard), CSS variables, base styles, reduced-motion media query.
+
+**Build result:** 472KB JS (135KB gzip), 10KB CSS (2.5KB gzip). Clean build, zero warnings.
+
+**Browser test:** Login → Attention Queue → Filtered Leads → All Conversations → Conversation View. Zero console errors. All layouts render correctly.
+
+---
+
+## Security Hardening Pass (2026-04-01)
+
+Comprehensive code review identified 16 issues across CRITICAL/HIGH/MEDIUM severity. All fixed and verified.
+
+### CRITICAL/HIGH Fixes
+
+| # | Issue | Fix |
+|---|-------|-----|
+| 1 | SMS inbound endpoint had no authentication | Added Basic Auth + X-Pling-Auth header verification middleware |
+| 2 | Open registration allowed anyone to create PM accounts | Gated behind `ALLOW_REGISTRATION=true` env flag (default: disabled) |
+| 3 | `loadListingData()` vulnerable to path traversal via `listing_id` | Reject any listing_id not matching `^[a-zA-Z0-9_-]+$` |
+| 4 | E.164 normalization double-prefixed numbers starting with `47` | Detect `47XXXXXXXX` pattern, only prepend `+` instead of `+47` |
+| 5 | `sendFirstMessage()` race condition on concurrent calls | Conditional `UPDATE ... WHERE flow_state = 'pending_compose' RETURNING id` |
+| 6 | `PATCH /api/conversations/:id` accepted arbitrary flow_state | Whitelist of 20 valid states, rejects everything else |
+| 7 | SMS send didn't check `consent_sms` flag | Added consent check before sending |
+| 8 | Frontend silently swallowed API errors everywhere | All views show retry buttons on failure; error states propagated |
+
+### MEDIUM Fixes
+
+| # | Issue | Fix |
+|---|-------|-----|
+| 9 | Lead ingest could fail on unique constraint race | INSERT wrapped in try/catch for `23505`, returns duplicate gracefully |
+| 10 | `scoring_status` inconsistency (`completed` vs `complete`) | Standardized to `complete` |
+| 11 | Migration errors silently swallowed | Now logs `console.warn` unless "already exists" |
+| 12 | List components had empty catch blocks | All check `res.ok` and show retry UI |
+| 13 | Destructive actions (takeover, override) had no confirmation | Added `window.confirm()` for takeover, release, and push-to-pipeline |
+| 14 | Keyboard accessibility missing on clickable rows | Added `role="button"`, `tabIndex={0}`, Enter/Space handlers |
+| 15 | HMAC verification used re-serialized JSON instead of raw body | Express `verify` callback captures raw buffer for `/api/leads/ingest` |
+| 16 | Dashboard showed blank screen while loading | Shows loading indicator; unused imports cleaned up |
+
+**Build result:** 475KB JS (135KB gzip), 10KB CSS (2.5KB gzip). Clean build.
+
+**Smoke tests:** Registration blocked ✓ | Flow state whitelist ✓ | HMAC verification ✓ | Server starts cleanly ✓
+
+---
+
+## Phase 5: Google Apps Script Webhook (2026-04-01)
+
+### What Was Built
+
+The `scripts/google-apps-script.js` file contains the complete Apps Script code to push Google Form submissions to the Atelier backend.
+
+**Webhook tests (all passing):**
+- Valid HMAC-signed payload → 200, lead ingested (or duplicate detected)
+- Duplicate submission → 200 with `duplicate: true` (idempotent)
+- Bad HMAC signature → 401 "Invalid webhook signature"
+- Missing signature → 401 "Missing webhook signature"
+
+### Deployment Guide
+
+#### Step 1: Open Apps Script
+1. Open the Google Sheet linked to your Google Form
+2. Go to **Extensions → Apps Script**
+3. Delete any existing code in `Code.gs`
+4. Paste the entire contents of `scripts/google-apps-script.js`
+
+#### Step 2: Set Script Properties
+1. In Apps Script, click the gear icon (**Project Settings**)
+2. Scroll to **Script Properties** and add these 3 properties:
+
+| Property | Value |
+|----------|-------|
+| `ATELIER_WEBHOOK_URL` | `https://atelier-3phm.onrender.com/api/leads/ingest` |
+| `ATELIER_WEBHOOK_SECRET` | Same value as `WEBHOOK_SECRET` in your Atelier `.env` |
+| `ATELIER_LISTING_ID` | `N94_3ROMS` (or the listing this form is for) |
+
+#### Step 3: Create Form Submit Trigger
+1. In Apps Script, click the clock icon (**Triggers**)
+2. Click **+ Add Trigger**
+3. Configure:
+   - Function: `onFormSubmit`
+   - Event source: **From spreadsheet**
+   - Event type: **On form submit**
+4. Click **Save** and authorize when prompted
+
+#### Step 4: Test
+1. Submit a test entry through the Google Form
+2. In Apps Script, go to **Executions** to see the log
+3. Check the Atelier PM Dashboard — the lead should appear
+
+#### Step 5: Backfill (Optional)
+If there are existing form responses that were submitted before the trigger was set up:
+1. In Apps Script, select `backfillExistingRows` from the function dropdown
+2. Click **Run**
+3. This sends all existing rows to Atelier (with idempotency — safe to run multiple times)
+
+#### Column Mapping
+
+| Column | Form Question | Field |
+|--------|---------------|-------|
+| A | Timestamp | `timestamp` |
+| B | Hva er ditt fulle navn? | `name` |
+| C | Hva er din alder? | `age` |
+| D | Hva er din e-post? | `email` |
+| E | Telefonnummer inkl landskode | `phone` |
+| F | Når ønsker du å leie i fra? | `move_in_date` |
+| G | Hva er din nåværende status? | `tenant_status` |
+| H | En kort intro/beskrivelse | `intro` |
+| I | Kjønn (valgfritt) | `gender` |
+
+---
+
+## Phase 3: Scoring Refinement (2026-04-01)
+
+### What Was Built
+
+#### 1. A/B Scoring Endpoint (`POST /api/conversations/:id/score-ab`)
+Runs the same conversation transcript through both Haiku and Sonnet in sequence, returning side-by-side results for comparison.
+
+**Test results (first run):**
+| Model | Score | Latency | Input Tokens | Output Tokens |
+|-------|-------|---------|-------------|---------------|
+| Sonnet | 25/100 | 4,896ms | 5,185 | 269 |
+| Haiku | 15/100 | 2,471ms | 5,185 | 282 |
+| **Diff** | **10 pts** | **Haiku 2x faster** | Same | Similar |
+
+**Takeaway:** Haiku is 2x faster and gives similar directional scores. 10-point difference is acceptable for monitoring but Sonnet remains more reliable for final scoring decisions.
+
+#### 2. SMS-Adapted Scoring Rubric
+Updated `prompts/LeadScoring.md` engagement quality section (sub-component #3):
+- 3-5 SMS messages is now scored as **normal** (not penalized)
+- Signal quality per message matters more than total turn count
+- Calendly/video link clicks = strong positive signal (4+)
+- "I'll think about it" after 2-3 messages = neutral (3), not negative
+- Response timing (hours vs days) factored into engagement rate
+
+#### 3. Auto-Rescore on Key State Transitions
+When `flow_state` transitions to any of: `wants_to_rent`, `confirmed`, `booked_calendly`, `call_completed`, `soft_commitment` — the system automatically triggers a background re-score if:
+- No pending score exists
+- At least one tenant message is present
+
+This ensures the PM dashboard reflects the latest scoring at critical decision points.
+
+#### 4. Dual Score Display
+- **API**: `GET /api/conversations/:id` now returns both `latestScore` (conversation-type) and `preliminaryScore` (form-type)
+- **ConversationView sidebar**: Shows "Form Score" (preliminary) and "Conv. Score" (latest conversation score) with color coding:
+  - Green (≥70): High quality
+  - Yellow (40-69): Medium
+  - Red (<40): Low quality
+- **AllConversations list**: Score column prefers `latest_score` over `preliminary_score`, with same color coding
+
+---
+
+## Phase 4: MCP Prompt Streamlining (2026-04-01)
+
+### What Was Built
+
+#### 1. Anthropic Prompt Caching
+Enabled prompt caching in `lib/chatRuntime.js`:
+- System prompt sent as content block with `cache_control: { type: 'ephemeral' }` (Anthropic caches for 5 minutes)
+- Added `anthropic-beta: prompt-caching-2024-07-31` header
+- `buildUsage()` now tracks `cacheCreationInputTokens` and `cacheReadInputTokens`
+- Expected ~90% cost reduction on cached input tokens for repeated conversations with the same listing
+
+#### 2. Listing Snapshot Integration
+- `buildSystemPrompt()` now checks `conversation.listing_snapshot.listing_data` before falling back to disk file read
+- New endpoint: `POST /api/conversations/:id/refresh-snapshot` — reloads listing data from disk into the conversation's `listing_snapshot` JSONB column
+- Snapshot includes `refreshed_at` timestamp for tracking staleness
+- Audit logged as `listing_snapshot_refreshed`
+
+**Test result:** Listing snapshot refresh returns cached data successfully. Subsequent `buildSystemPrompt` calls use the cached snapshot instead of disk I/O.
+
+### All Phases Complete
+
+| Phase | Status | Summary |
+|-------|--------|---------|
+| Phase 0: Auth | ✅ | JWT auth, rate limiting, audit logging, CORS |
+| Phase 1A: Model Split | ✅ | Haiku for chat, Sonnet for scoring |
+| Phase 1B: Channel Layer | ✅ | SMS via Pling, channel-agnostic architecture |
+| Phase 1C: Lead Ingestion | ✅ | Google Sheets → scoring gate → pipeline |
+| Phase 1D: First Message | ✅ | Templated SMS with video + Calendly |
+| Phase 1E: Prompt Updates | ✅ | SMS context, flow states, tenant profile |
+| Phase 2: PM Dashboard | ✅ | Full dashboard with attention queue, filters, conversation view |
+| Phase 3: Scoring | ✅ | A/B endpoint, SMS rubric, auto-rescore, dual display |
+| Phase 4: MCP/Caching | ✅ | Prompt caching, listing snapshots |
+| Phase 5: Apps Script | ✅ | Webhook script ready for deployment |
+| Security Hardening | ✅ | 16 issues fixed across CRITICAL/HIGH/MEDIUM |

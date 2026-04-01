@@ -12,13 +12,17 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.28.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.3.2",
+    "jsonwebtoken": "^9.0.3",
     "openai": "^5.23.0",
     "pg": "^8.20.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-router-dom": "^7.13.2",
     "vite": "^7.1.7"
   },
   "devDependencies": {

@@ -55,19 +55,19 @@ Score the FIRST message only. This reflects effort, respect, and seriousness.
 
 ── 3. ENGAGEMENT QUALITY (1–5) ──
 
-Quality over quantity. More turns does NOT mean higher score. What matters is whether the questions move toward a decision or waste time.
+Quality over quantity. In SMS conversations, threads are naturally shorter (3-5 messages is typical). Score based on signal quality per message, NOT total turn count.
 
-5 = Asks decision-making questions: contract process, deposit logistics, move-in procedure, "how do we sign?" Watches video tour and follows up. Progresses clearly toward renting.
-4 = Asks practical + lifestyle questions: rent details, furnishing, what's included, gym nearby, distance to university. Is imagining themselves living there.
-3 = Asks basic factual questions (size, rent, rooms) without clear progression toward a decision. Moderate engagement, no strong signal either way.
-2 = Many turns but circular — asks questions without ever moving toward next steps. Negotiates price across multiple turns without accepting. Goes off-topic (other properties, buying).
-1 = Single bare question with no follow-up. OR: excessive turns that go nowhere — classic time-waster pattern.
+5 = Decision-oriented engagement: asks about contract, deposit, move-in, booking, "how do we sign?" Watches video tour and follows up. Every message moves toward commitment.
+4 = Practical + lifestyle questions: rent details, furnishing, what's included, distance to university. Is imagining themselves living there. Strong signal-to-message ratio.
+3 = Basic factual questions (size, rent, rooms) or only 1-2 messages exchanged. Moderate interest, no strong signal either way. This is NORMAL for SMS — do not penalize short threads alone.
+2 = Circular questioning — asks without progressing toward a decision. Negotiates price repeatedly. Goes off-topic. Low signal despite multiple messages.
+1 = Single bare question with no follow-up after AI response. OR: excessive turns that go nowhere.
 
-Time-waster patterns to watch for:
-- Asks 5+ questions but never mentions signing, contract, or next steps
-- Keeps negotiating rent after being told prices are non-negotiable
-- Asks about buying the property, full property lists, or other buildings
-- Asks repetitive questions already answered in earlier turns
+SMS-specific guidance:
+- A 3-message thread with clear intent signals scores HIGHER than a 10-message thread with no progression
+- Clicking a Calendly link or video tour link = strong positive signal (score 4+)
+- "Tenker på det" / "I'll think about it" after 2-3 messages = score 3 (neutral, not negative)
+- Engagement rate matters: responding within hours = positive. Days of silence = neutral.
 
 ── 4. CONVERSION INTENT SIGNALS (1–5) ──
 

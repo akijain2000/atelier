@@ -1,0 +1,4 @@
+{
+  "no": "Hei {{name}}! Takk for at du er interessert i {{property}}. Sjekk videoomvisningen: {{video_url}} Du kan også booke en samtale med oss: {{calendly_url}} Vi er tilgjengelige det meste av uken!",
+  "en": "Hi {{name}}! Thanks for your interest in {{property}}. Check out the video tour: {{video_url}} You can also book a call with us: {{calendly_url}} We're available most of the week!"
+}
