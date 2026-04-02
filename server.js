@@ -128,7 +128,8 @@ async function initDb() {
     `ALTER TABLE messages ADD COLUMN IF NOT EXISTS delivery_status TEXT`,
     `ALTER TABLE messages ADD COLUMN IF NOT EXISTS external_id TEXT`,
     `ALTER TABLE scores ADD COLUMN IF NOT EXISTS score_type TEXT DEFAULT 'conversation'`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_conversations_phone ON conversations (phone) WHERE phone IS NOT NULL`,
+    `DROP INDEX IF EXISTS idx_conversations_phone`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_conversations_phone_listing ON conversations (phone, listing_id) WHERE phone IS NOT NULL AND flow_state NOT IN ('lost', 'signed', 'opted_out')`,
   ];
   for (const sql of migrations) {
     await db.query(sql).catch((err) => {
@@ -234,6 +235,18 @@ async function loadListingData(listingId) {
     if (err.code === 'ENOENT') return null;
     throw err;
   }
+}
+
+function extractListingMeta(listingText) {
+  if (!listingText) return {};
+  const meta = {};
+  const addressMatch = listingText.match(/Address:\s*(.+)/i);
+  if (addressMatch) meta.address = addressMatch[1].trim();
+  const titleMatch = listingText.match(/Title:\s*(.+)/i);
+  if (titleMatch) meta.title = titleMatch[1].trim();
+  const videoMatch = listingText.match(/Video tour:\s*(https?:\/\/\S+)/i);
+  if (videoMatch) meta.videoUrl = videoMatch[1].trim();
+  return meta;
 }
 
 function buildTenantProfile(conversation) {
@@ -792,7 +805,16 @@ async function composeFirstMessage(conversation) {
   const lang = detectLanguage(conversation.intro);
   const template = templates[lang] || templates.no;
 
-  const videoUrl = VIDEO_TOUR_URL || '';
+  let videoUrl = VIDEO_TOUR_URL || '';
+  if (!videoUrl && conversation.listing_snapshot) {
+    const snap = typeof conversation.listing_snapshot === 'string'
+      ? JSON.parse(conversation.listing_snapshot) : conversation.listing_snapshot;
+    videoUrl = snap.video_url || '';
+    if (!videoUrl && snap.listing_data) {
+      const meta = extractListingMeta(snap.listing_data);
+      videoUrl = meta.videoUrl || '';
+    }
+  }
 
   return fillTemplate(template, {
     name: conversation.tenant_name || 'der',
@@ -892,18 +914,27 @@ app.post('/api/leads/ingest', webhookAuth, async (req, res, next) => {
       return res.json({ ok: true, duplicate: true, conversationId: existing.rows[0].id });
     }
 
+    const listingData = listing_id ? await loadListingData(listing_id) : null;
+    const listingMeta = extractListingMeta(listingData);
+
     let convo;
     try {
       convo = await db.query(
-        `INSERT INTO conversations (tenant_name, phone, email, age, move_in_date, tenant_status, gender, intro, listing_id, source, consent_sms, flow_state, listing_snapshot)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'google_form', true, 'lead_ingested', $10)
+        `INSERT INTO conversations (tenant_name, phone, email, age, move_in_date, tenant_status, gender, intro, listing_id, property, source, consent_sms, flow_state, listing_snapshot)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'google_form', true, 'lead_ingested', $11)
          RETURNING id`,
         [
           name || null, normalizedPhone, email || null,
           age ? Number(age) : null, move_in_date || null,
           tenant_status || null, gender || null, intro || null,
           listing_id || null,
-          JSON.stringify({ idempotency_key: idempotencyKey, ingested_at: new Date().toISOString() }),
+          listingMeta.address || null,
+          JSON.stringify({
+            idempotency_key: idempotencyKey,
+            ingested_at: new Date().toISOString(),
+            listing_data: listingData || null,
+            video_url: listingMeta.videoUrl || null,
+          }),
         ],
       );
     } catch (insertErr) {

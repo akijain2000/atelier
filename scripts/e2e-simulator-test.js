@@ -6,7 +6,7 @@
  * Tests the full flow: Lead ingestion -> First SMS -> Rova simulator -> Tenant reply -> AI auto-reply
  *
  * Usage:
- *   ATELIER_URL=https://atelier-3phm.onrender.com \
+ *   ATELIER_URL=https://atelier-production-b43e.up.railway.app \
  *   ROVA_URL=https://rova-xxx.onrender.com \
  *   WEBHOOK_SECRET=xxx \
  *   SIMULATOR_SECRET=xxx \

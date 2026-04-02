@@ -471,7 +471,7 @@ Created `CLAUDE.md` with project context, deploy config, and health stack for gs
 - Configured: Node runtime, `main` branch, Free tier ($0/month, 512MB RAM, 0.1 CPU)
 - Set all 6 environment variables via the Render dashboard
 - Build completed in ~20 seconds. Server started on port 10000.
-- **Production URL:** `https://atelier-3phm.onrender.com`
+- **Production URL:** `https://atelier-production-b43e.up.railway.app` (migrated from Render to Railway)
 
 **Why Render Free tier:** This is a prototype/demo deployment. Free tier spins down after inactivity (50s cold start), but that's acceptable for stakeholder demos. Upgrade to Starter ($7/month) when sharing with real property managers.
 
@@ -704,7 +704,7 @@ The `scripts/google-apps-script.js` file contains the complete Apps Script code 
 
 | Property | Value |
 |----------|-------|
-| `ATELIER_WEBHOOK_URL` | `https://atelier-3phm.onrender.com/api/leads/ingest` |
+| `ATELIER_WEBHOOK_URL` | `https://atelier-production-b43e.up.railway.app/api/leads/ingest` |
 | `ATELIER_WEBHOOK_SECRET` | Same value as `WEBHOOK_SECRET` in your Atelier `.env` |
 | `ATELIER_LISTING_ID` | `N94_3ROMS` (or the listing this form is for) |
 

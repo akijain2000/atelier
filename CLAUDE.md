@@ -5,12 +5,12 @@ Node.js + Express backend, React 19 + Vite frontend, PostgreSQL (Neon), Anthropi
 
 ## Deploy Configuration (configured by /setup-deploy)
 - Platform: Render
-- Production URL: https://atelier.onrender.com
+- Production URL: https://atelier-production-b43e.up.railway.app
 - Deploy workflow: auto-deploy on push to main
 - Deploy status command: HTTP health check
 - Merge method: squash
 - Project type: web app
-- Post-deploy health check: https://atelier.onrender.com/api/health
+- Post-deploy health check: https://atelier-production-b43e.up.railway.app/api/health
 
 ### Custom deploy hooks
 - Pre-merge: npm run build (verified by render.yaml buildCommand)
