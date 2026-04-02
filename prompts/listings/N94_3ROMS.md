@@ -60,7 +60,7 @@ PRICING RULES:
 Video tour: https://drive.google.com/file/d/1-i-B0aCXu7AlW9sPUXmqgxmvo0SK-mtN/view?usp=drive_link
 
 Physical viewing is NOT required — tenants can rent based on the video tour.
-Only share the video link when the tenant asks for a viewing or to see the apartment.
+Share the video link proactively in your FIRST reply to the tenant (see VIEWING FLOW in system prompt).
 
 ── PARKING ──
 

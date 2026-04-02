@@ -800,11 +800,7 @@ function fillTemplate(template, vars) {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] || '');
 }
 
-async function composeFirstMessage(conversation) {
-  const templates = await loadFirstMessageTemplates();
-  const lang = detectLanguage(conversation.intro);
-  const template = templates[lang] || templates.no;
-
+function resolveVideoUrl(conversation) {
   let videoUrl = VIDEO_TOUR_URL || '';
   if (!videoUrl && conversation.listing_snapshot) {
     const snap = typeof conversation.listing_snapshot === 'string'
@@ -815,13 +811,25 @@ async function composeFirstMessage(conversation) {
       videoUrl = meta.videoUrl || '';
     }
   }
+  return videoUrl;
+}
 
-  return fillTemplate(template, {
+async function composeFirstMessages(conversation) {
+  const templates = await loadFirstMessageTemplates();
+  const lang = detectLanguage(conversation.intro);
+
+  const vars = {
     name: conversation.tenant_name || 'der',
     property: conversation.property || 'boligen',
-    video_url: videoUrl,
+    video_url: resolveVideoUrl(conversation),
     calendly_url: CALENDLY_URL,
-  });
+  };
+
+  const greeting = fillTemplate(templates[lang] || templates.no, vars);
+  const videoTemplate = templates[`video_${lang}`] || templates.video_no;
+  const videoMsg = vars.video_url ? fillTemplate(videoTemplate, vars) : null;
+
+  return { greeting, videoMsg };
 }
 
 async function sendFirstMessage(conversationId) {
@@ -845,11 +853,11 @@ async function sendFirstMessage(conversationId) {
     return { skipped: true, reason: 'Already being processed (concurrent send)' };
   }
 
-  const messageText = await composeFirstMessage(conv);
+  const { greeting, videoMsg } = await composeFirstMessages(conv);
 
-  let result;
+  let greetingResult;
   try {
-    result = await channelSend(CHANNELS.SMS, conv.phone, messageText, { conversationId });
+    greetingResult = await channelSend(CHANNELS.SMS, conv.phone, greeting, { conversationId });
   } catch (sendErr) {
     await db.query(
       `UPDATE conversations SET flow_state = 'pending_compose', updated_at = NOW() WHERE id = $1`,
@@ -858,30 +866,57 @@ async function sendFirstMessage(conversationId) {
     throw sendErr;
   }
 
-  if (result.success) {
+  if (!greetingResult.success) {
     await db.query(
-      `INSERT INTO messages (conversation_id, role, content, channel, delivery_status, external_id)
-       VALUES ($1, 'assistant', $2, 'sms', $3, $4)`,
-      [conversationId, messageText, result.status, result.externalId],
+      `UPDATE conversations SET flow_state = 'pending_compose', updated_at = NOW() WHERE id = $1`,
+      [conversationId],
     );
-    await db.query(
-      `UPDATE conversations SET flow_state = 'first_message_sent', message_count = message_count + 1, preview = $2, updated_at = NOW() WHERE id = $1`,
-      [conversationId, messageText.slice(0, 200)],
-    );
-    await logAudit(db, {
-      actor: 'system',
-      action: ACTIONS.MESSAGE_SENT,
-      conversationId,
-      details: { channel: 'sms', type: 'first_message', segments: result.segments },
-    });
-    return { sent: true, segments: result.segments, externalId: result.externalId };
+    return { sent: false, error: greetingResult.error };
   }
 
   await db.query(
-    `UPDATE conversations SET flow_state = 'pending_compose', updated_at = NOW() WHERE id = $1`,
+    `INSERT INTO messages (conversation_id, role, content, channel, delivery_status, external_id)
+     VALUES ($1, 'assistant', $2, 'sms', $3, $4)`,
+    [conversationId, greeting, greetingResult.status, greetingResult.externalId],
+  );
+  await db.query(
+    `UPDATE conversations SET message_count = message_count + 1, preview = $2, updated_at = NOW() WHERE id = $1`,
+    [conversationId, greeting.slice(0, 200)],
+  );
+
+  let totalSegments = greetingResult.segments || 1;
+
+  if (videoMsg) {
+    try {
+      const videoResult = await channelSend(CHANNELS.SMS, conv.phone, videoMsg, { conversationId });
+      if (videoResult.success) {
+        await db.query(
+          `INSERT INTO messages (conversation_id, role, content, channel, delivery_status, external_id)
+           VALUES ($1, 'assistant', $2, 'sms', $3, $4)`,
+          [conversationId, videoMsg, videoResult.status, videoResult.externalId],
+        );
+        await db.query(
+          `UPDATE conversations SET message_count = message_count + 1, preview = $2, updated_at = NOW() WHERE id = $1`,
+          [conversationId, videoMsg.slice(0, 200)],
+        );
+        totalSegments += videoResult.segments || 1;
+      }
+    } catch (videoErr) {
+      console.error('Video tour follow-up SMS failed:', videoErr.message);
+    }
+  }
+
+  await db.query(
+    `UPDATE conversations SET flow_state = 'first_message_sent', updated_at = NOW() WHERE id = $1`,
     [conversationId],
   );
-  return { sent: false, error: result.error };
+  await logAudit(db, {
+    actor: 'system',
+    action: ACTIONS.MESSAGE_SENT,
+    conversationId,
+    details: { channel: 'sms', type: 'first_message', segments: totalSegments, parts: videoMsg ? 2 : 1 },
+  });
+  return { sent: true, segments: totalSegments, externalId: greetingResult.externalId };
 }
 
 // ── Lead Ingestion (public, HMAC-verified from Google Apps Script) ──
