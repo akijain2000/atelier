@@ -804,7 +804,7 @@ Enabled prompt caching in `lib/chatRuntime.js`:
 
 **Test result:** Listing snapshot refresh returns cached data successfully. Subsequent `buildSystemPrompt` calls use the cached snapshot instead of disk I/O.
 
-### All Phases Complete
+### All V2 Phases Complete
 
 | Phase | Status | Summary |
 |-------|--------|---------|
@@ -819,3 +819,74 @@ Enabled prompt caching in `lib/chatRuntime.js`:
 | Phase 4: MCP/Caching | ✅ | Prompt caching, listing snapshots |
 | Phase 5: Apps Script | ✅ | Webhook script ready for deployment |
 | Security Hardening | ✅ | 16 issues fixed across CRITICAL/HIGH/MEDIUM |
+| Phase 6: SMS Simulator | 📋 Planned | Virtual phone in Rova for E2E testing without SMS provider |
+
+---
+
+## Phase 6: SMS Simulator via Rova (Planned — 2026-04-02)
+
+### Problem
+
+Pling SMS is not configured, blocking all end-to-end testing of the AI conversation flow. Need a way to simulate SMS behavior so we can test system prompts, scoring, and the full tenant journey without a real SMS provider.
+
+### Planning & Engineering Review
+
+**Plan file:** `~/.cursor/plans/sms_simulator_via_rova_95efe1d7.plan.md`
+
+**gstack /plan-eng-review completed.** 10 issues reviewed, all resolved:
+
+| # | Issue | Decision |
+|---|-------|----------|
+| 1 | Rova deployment access | Confirmed: Rova is on Render, full push and deploy access |
+| 2 | Auth mismatch (Atelier inbound expects Pling creds) | Add `X-Simulator-Secret` auth path to existing inbound handler |
+| 3 | Real-time UI updates | Polling every 3 seconds (boring technology for a dev tool) |
+| 4 | Infinite loop / race conditions | Idempotency key + replying lock + debounce timer |
+| 5 | Rova access level | Full push and deploy access confirmed |
+| 6 | Character truncation breaks URLs | Two-layer: `max_tokens` on API call + sentence-boundary truncation as safety net |
+| 7 | Rova reply payload format | Separate `parseSimulatorInbound()` in `sms.js` (not coupled to Pling format) |
+| 8 | Conversation ID tracking | Phone as natural key, `conversation_id` as optimization from last outbound |
+| 9 | No tests in plan | Single E2E test script covering critical round-trip paths |
+| 10 | Concurrent message processing | Sequential per conversation with queue (prevents context confusion) |
+
+### Architecture Decision: Natural Conversation Flow
+
+Replaced rigid ping-pong auto-reply with debounce-based natural conversation flow:
+
+- **Debounce window:** 30 seconds (`SMS_REPLY_DELAY_S`). Timer resets on each new message.
+- **Hard cap:** 2 minutes (`SMS_REPLY_MAX_WAIT_S`). Responds regardless after 2 min from first unresponded message.
+- **Mid-generation interrupt:** Finish current response, send it, then start shorter 10-second debounce for new messages.
+- **Batch response:** AI sees ALL unresponded messages and generates ONE response addressing everything.
+
+**Why:** Real texting isn't ping-pong. People send 2-3 messages, then the other person reads them all and responds to everything. This makes the AI feel like a real person texting, not an automation tool.
+
+### What Will Be Built
+
+**Atelier changes:**
+- New `lib/channels/simulator.js` — HTTP POST adapter to Rova
+- Modified `lib/channels/sms.js` — export GSM utilities, add `parseSimulatorInbound()`
+- Modified `lib/channels/index.js` — register simulator adapter, `SMS_CHANNEL_MODE` switch
+- Modified `server.js` — simulator auth on inbound, debounce-based auto-reply, character enforcement
+- New env vars: `SMS_CHANNEL_MODE`, `SIMULATOR_WEBHOOK_URL`, `SIMULATOR_SECRET`, `SMS_MAX_CHARS`, `SIMULATOR_AUTO_REPLY`, `SMS_REPLY_DELAY_S`, `SMS_REPLY_MAX_WAIT_S`
+
+**Rova changes:**
+- New DB table: `simulated_sms` (phone, direction, body, segments, char_count, conversation_id, message_id)
+- 5 new API routes: POST (receive from Atelier), GET phones, GET thread, POST reply (forward to Atelier), DELETE clear
+- New React component: `SmsSimulator.jsx` — phone list + thread view + char/segment counter + GSM indicator
+- New route: `/sms-simulator`
+- New env vars: `SIMULATOR_SECRET`, `ATELIER_INBOUND_URL`
+
+### Deployment Order
+
+1. Rova backend (DB + routes) — deploy first
+2. Rova frontend (SMS Simulator UI)
+3. Atelier channel changes (adapter + env vars + auth)
+4. Atelier debounce-based auto-reply
+5. E2E test: Google Form → Atelier → Rova simulator → tenant reply → AI response
+
+### Parallelization
+
+- **Lane A (Rova):** Backend → Frontend. Sequential, same project.
+- **Lane B (Atelier):** Simulator adapter + sms.js exports + index.js + char limit. Sequential, same project.
+- **Launch A + B in parallel.** No shared files.
+- **Lane C:** Integration (inbound auth + auto-reply). After A + B.
+- **Lane D:** E2E test script. After C.

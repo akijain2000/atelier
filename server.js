@@ -18,10 +18,13 @@ import {
 } from './lib/chatRuntime.js';
 import { requireAuth, hashPassword, verifyPassword, signToken, verifyWebhookSignature } from './lib/auth.js';
 import { logAudit, ACTIONS } from './lib/auditLog.js';
-import { send as channelSend, parseInbound as channelParseInbound, CHANNELS, DELIVERY_STATUS, OPT_OUT_KEYWORDS, normalizeE164 } from './lib/channels/index.js';
+import { send as channelSend, parseInbound as channelParseInbound, CHANNELS, DELIVERY_STATUS, OPT_OUT_KEYWORDS, normalizeE164, getSmsChannelMode } from './lib/channels/index.js';
 
 const LEAD_SCORE_THRESHOLD = Number(process.env.LEAD_SCORE_THRESHOLD) || 40;
 const webhookSecret = process.env.WEBHOOK_SECRET;
+const SMS_REPLY_DELAY = (Number(process.env.SMS_REPLY_DELAY_S) || 30) * 1000;
+const SMS_REPLY_MAX_WAIT = (Number(process.env.SMS_REPLY_MAX_WAIT_S) || 120) * 1000;
+const SMS_SHORT_DEBOUNCE = 10_000;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -33,6 +36,8 @@ const port = Number(process.env.PORT || 3001);
 const distPath = path.join(__dirname, 'dist');
 const listingsDir = path.join(__dirname, 'prompts', 'listings');
 const promptCache = new Map();
+
+const replyTimers = new Map();
 
 async function initDb() {
   await db.query(`
@@ -117,6 +122,8 @@ async function initDb() {
     `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS flow_state TEXT DEFAULT 'lead_ingested'`,
     `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS preliminary_score INT`,
     `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS listing_snapshot JSONB`,
+    `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS auto_reply_paused BOOLEAN DEFAULT false`,
+    `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS channel TEXT DEFAULT 'sms'`,
     `ALTER TABLE messages ADD COLUMN IF NOT EXISTS channel TEXT DEFAULT 'web'`,
     `ALTER TABLE messages ADD COLUMN IF NOT EXISTS delivery_status TEXT`,
     `ALTER TABLE messages ADD COLUMN IF NOT EXISTS external_id TEXT`,
@@ -279,6 +286,25 @@ function stripMarkdown(text) {
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/^[-*]\s+/gm, '- ')
     .replace(/\[(.+?)\]\((.+?)\)/g, '$1: $2');
+}
+
+function truncateSms(text) {
+  const maxChars = parseInt(process.env.SMS_MAX_CHARS) || 320;
+  if (text.length <= maxChars) return text;
+
+  const lastDot = text.lastIndexOf('.', maxChars - 1);
+  const lastQuestion = text.lastIndexOf('?', maxChars - 1);
+  const lastExclaim = text.lastIndexOf('!', maxChars - 1);
+  const cutPoint = Math.max(lastDot, lastQuestion, lastExclaim);
+
+  let result;
+  if (cutPoint > maxChars * 0.5) {
+    result = text.slice(0, cutPoint + 1);
+  } else {
+    result = text.slice(0, maxChars - 3) + '...';
+  }
+  console.warn('[SMS] Truncation fired: original=%d chars, truncated=%d chars', text.length, result.length);
+  return result;
 }
 
 function buildChatPayload(chat, promptVariant = null) {
@@ -801,7 +827,7 @@ async function sendFirstMessage(conversationId) {
 
   let result;
   try {
-    result = await channelSend(CHANNELS.SMS, conv.phone, messageText);
+    result = await channelSend(CHANNELS.SMS, conv.phone, messageText, { conversationId });
   } catch (sendErr) {
     await db.query(
       `UPDATE conversations SET flow_state = 'pending_compose', updated_at = NOW() WHERE id = $1`,
@@ -971,9 +997,148 @@ app.post('/api/leads/:id/override', requireAuth, async (req, res, next) => {
   }
 });
 
+// ── Debounce-based SMS Auto-Reply ──
+
+async function generateAndSendAutoReply(conversationId) {
+  const entry = replyTimers.get(conversationId);
+  if (entry) entry.generating = true;
+
+  try {
+    const convo = await db.query('SELECT * FROM conversations WHERE id = $1', [conversationId]);
+    if (!convo.rows.length) return;
+    const conversation = convo.rows[0];
+
+    const allMsgs = await db.query(
+      'SELECT role, content FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC',
+      [conversationId],
+    );
+    const chatMessages = allMsgs.rows.map((m) => ({
+      role: m.role === 'tenant' || m.role === 'admin' ? 'user' : 'assistant',
+      content: m.content,
+    }));
+
+    let listingId = conversation.listing_id;
+    if (!listingId) {
+      try {
+        const files = await fs.readdir(listingsDir);
+        const first = files.find(f => f.endsWith('.md'));
+        if (first) listingId = path.basename(first, '.md');
+      } catch {}
+    }
+    const systemPrompt = await buildSystemPrompt(listingId, conversation);
+    if (!systemPrompt) {
+      console.error('[AUTO-REPLY] No system prompt for conversation', conversationId);
+      return;
+    }
+
+    const runtime = getRuntimeConfig();
+    const provider = runtime.activeProvider;
+    const chatModel = process.env.ANTHROPIC_CHAT_MODEL || runtime.providers[provider]?.model;
+    const smsMaxTokens = Math.ceil((parseInt(process.env.SMS_MAX_CHARS) || 320) / 4);
+
+    const chat = await sendChat({
+      provider,
+      model: chatModel,
+      systemPrompt,
+      messages: chatMessages,
+      max_tokens: smsMaxTokens,
+    });
+
+    let replyText = stripMarkdown(chat.text);
+    replyText = truncateSms(replyText);
+
+    await db.query(
+      `INSERT INTO messages (conversation_id, role, content, channel, delivery_status, model, latency_ms, metadata)
+       VALUES ($1, 'assistant', $2, 'sms', 'pending', $3, $4, $5)`,
+      [conversationId, replyText, chat.model, chat.latencyMs,
+       JSON.stringify({ usage: chat.usage, responseId: chat.providerResponseId, auto_reply: true })],
+    );
+
+    const sendResult = await channelSend(CHANNELS.SMS, conversation.phone, replyText, { conversationId });
+
+    if (sendResult.success) {
+      await db.query(
+        `UPDATE messages SET delivery_status = $2, external_id = $3
+         WHERE id = (
+           SELECT id FROM messages
+           WHERE conversation_id = $1 AND role = 'assistant' AND delivery_status = 'pending'
+           ORDER BY created_at DESC LIMIT 1
+         )`,
+        [conversationId, sendResult.status, sendResult.externalId],
+      );
+      await db.query(
+        `UPDATE conversations SET message_count = message_count + 1, preview = $2, updated_at = NOW() WHERE id = $1`,
+        [conversationId, replyText.slice(0, 200)],
+      );
+      console.log('[AUTO-REPLY] Sent reply to conversation %s (%d chars, %d segs)', conversationId, replyText.length, sendResult.segments);
+    } else {
+      console.error('[AUTO-REPLY] Send failed for conversation %s: %s', conversationId, sendResult.error);
+    }
+
+    await logAudit(db, {
+      actor: 'system',
+      action: ACTIONS.MESSAGE_SENT,
+      conversationId,
+      details: { channel: 'sms', type: 'auto_reply', success: sendResult.success, segments: sendResult.segments },
+    });
+  } catch (err) {
+    console.error('[AUTO-REPLY] Error for conversation %s:', conversationId, err.message);
+  } finally {
+    const entry = replyTimers.get(conversationId);
+    if (entry) {
+      entry.generating = false;
+
+      const newMsgsDuringGen = await db.query(
+        `SELECT COUNT(*) AS cnt FROM messages
+         WHERE conversation_id = $1 AND role = 'tenant' AND created_at > (
+           SELECT COALESCE(MAX(created_at), '1970-01-01') FROM messages WHERE conversation_id = $1 AND role = 'assistant'
+         )`,
+        [conversationId],
+      );
+      if (parseInt(newMsgsDuringGen.rows[0]?.cnt || '0') > 0) {
+        console.log('[AUTO-REPLY] New messages arrived during generation for %s, re-debouncing (10s)', conversationId);
+        scheduleAutoReply(conversationId, SMS_SHORT_DEBOUNCE);
+      } else {
+        replyTimers.delete(conversationId);
+      }
+    }
+  }
+}
+
+function scheduleAutoReply(conversationId, delayMs = SMS_REPLY_DELAY) {
+  const existing = replyTimers.get(conversationId);
+
+  if (existing?.generating) return;
+
+  if (existing?.timer) clearTimeout(existing.timer);
+
+  const firstMessageAt = existing?.firstMessageAt || Date.now();
+  const elapsed = Date.now() - firstMessageAt;
+
+  let effectiveDelay = delayMs;
+  if (elapsed + delayMs > SMS_REPLY_MAX_WAIT) {
+    effectiveDelay = Math.max(0, SMS_REPLY_MAX_WAIT - elapsed);
+  }
+
+  const timer = setTimeout(() => {
+    generateAndSendAutoReply(conversationId).catch((err) => {
+      console.error('[AUTO-REPLY] Unhandled error:', err.message);
+      replyTimers.delete(conversationId);
+    });
+  }, effectiveDelay);
+
+  replyTimers.set(conversationId, { timer, firstMessageAt, generating: false });
+}
+
 // ── SMS Inbound Webhook (public, verified by Basic Auth from Pling) ──
 
 app.post('/api/channels/sms/inbound', (req, res, next) => {
+  const simSecret = process.env.SIMULATOR_SECRET;
+  const simHeader = req.headers['x-simulator-secret'];
+  if (simSecret && simHeader && simHeader === simSecret) {
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
   const plingAuth = req.headers['x-pling-auth'];
   const expectedUser = process.env.PLING_USERNAME;
@@ -1009,7 +1174,7 @@ app.post('/api/channels/sms/inbound', (req, res, next) => {
     const isOptOut = OPT_OUT_KEYWORDS.some((kw) => text.toLowerCase() === kw);
 
     const convo = await db.query(
-      `SELECT id, flow_state FROM conversations WHERE phone = $1 LIMIT 1`,
+      `SELECT id, flow_state, auto_reply_paused FROM conversations WHERE phone = $1 LIMIT 1`,
       [phone],
     );
 
@@ -1054,6 +1219,14 @@ app.post('/api/channels/sms/inbound', (req, res, next) => {
       conversationId,
       details: { from: phone, text: text.slice(0, 100) },
     });
+
+    const autoReplyEnabled = (process.env.SIMULATOR_AUTO_REPLY || 'true').toLowerCase() === 'true';
+    const convData = convo.rows[0];
+    const isPaused = convData.auto_reply_paused === true;
+
+    if (autoReplyEnabled && !isPaused && !isOptOut) {
+      scheduleAutoReply(conversationId);
+    }
 
     res.json({ ok: true, conversationId });
   } catch (error) {
@@ -1238,14 +1411,19 @@ app.post('/api/conversations/:id/messages', requireAuth, async (req, res, next) 
 
     const runtime = getRuntimeConfig();
     const provider = runtime.activeProvider;
+    const isSmsConversation = conversation.channel === 'sms';
+    const smsMaxTokens = isSmsConversation ? Math.ceil((parseInt(process.env.SMS_MAX_CHARS) || 320) / 4) : undefined;
+
     const chat = await sendChat({
       provider,
       model: runtime.providers[provider].model,
       systemPrompt,
       messages: chatMessages,
+      ...(smsMaxTokens ? { max_tokens: smsMaxTokens } : {}),
     });
 
-    const cleanedText = stripMarkdown(chat.text);
+    let cleanedText = stripMarkdown(chat.text);
+    if (isSmsConversation) cleanedText = truncateSms(cleanedText);
 
     await client.query(
       `INSERT INTO messages (conversation_id, role, content, model, latency_ms, metadata)
@@ -1317,7 +1495,27 @@ const ALLOWED_FLOW_STATES = new Set([
 
 app.patch('/api/conversations/:id', requireAuth, async (req, res, next) => {
   try {
-    const { flow_state } = req.body;
+    const { flow_state, auto_reply_paused } = req.body;
+
+    if (typeof auto_reply_paused === 'boolean' && !flow_state) {
+      await db.query(
+        `UPDATE conversations SET auto_reply_paused = $2, updated_at = NOW() WHERE id = $1`,
+        [req.params.id, auto_reply_paused],
+      );
+      await logAudit(db, {
+        actor: req.user?.email || 'unknown',
+        action: 'auto_reply_toggled',
+        conversationId: req.params.id,
+        details: { paused: auto_reply_paused },
+      });
+      if (auto_reply_paused) {
+        const entry = replyTimers.get(req.params.id);
+        if (entry?.timer) clearTimeout(entry.timer);
+        replyTimers.delete(req.params.id);
+      }
+      return res.json({ ok: true, auto_reply_paused });
+    }
+
     if (!flow_state) return res.status(400).json({ error: 'flow_state is required.' });
     if (!ALLOWED_FLOW_STATES.has(flow_state)) {
       return res.status(400).json({ error: `Invalid flow_state: ${flow_state}` });
@@ -1326,9 +1524,16 @@ app.patch('/api/conversations/:id', requireAuth, async (req, res, next) => {
     const convo = await db.query('SELECT id, flow_state FROM conversations WHERE id = $1', [req.params.id]);
     if (!convo.rows.length) return res.status(404).json({ error: 'Conversation not found.' });
 
+    const updates = ['flow_state = $2', 'updated_at = NOW()'];
+    const params = [req.params.id, flow_state];
+    if (typeof auto_reply_paused === 'boolean') {
+      updates.push(`auto_reply_paused = $${params.length + 1}`);
+      params.push(auto_reply_paused);
+    }
+
     await db.query(
-      `UPDATE conversations SET flow_state = $2, updated_at = NOW() WHERE id = $1`,
-      [req.params.id, flow_state],
+      `UPDATE conversations SET ${updates.join(', ')} WHERE id = $1`,
+      params,
     );
 
     const action = flow_state === 'pm_takeover' ? ACTIONS.PM_TAKEOVER : ACTIONS.FLOW_STATE_CHANGED;
