@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atelier V2 — Product Requirements Document</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  :root {
+    --bg: #0C0E12; --bg-elevated: #13161C; --bg-card: #181C24; --bg-card-hover: #1E2330;
+    --border: #262C3A; --border-subtle: #1E2330;
+    --text: #E8EAF0; --text-secondary: #8B93A8; --text-muted: #5C6478;
+    --accent: #4F8CFF; --accent-glow: rgba(79,140,255,0.15);
+    --accent-warm: #FF7849; --accent-green: #34D399; --accent-yellow: #FBBF24;
+    --accent-purple: #A78BFA; --accent-rose: #FB7185;
+    --font-display: 'DM Serif Display', Georgia, serif;
+    --font-body: 'Instrument Sans', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  ::selection { background: #FFFFFF; color: #000000; }
+  ::-moz-selection { background: #FFFFFF; color: #000000; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; font-size: 16px; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-body); line-height: 1.7; -webkit-font-smoothing: antialiased; }
+
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(12,14,18,0.85); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border-subtle); padding: 0 2rem; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+  nav .logo { font-family: var(--font-display); font-size: 1.25rem; }
+  nav .logo span { color: var(--accent); }
+  nav .meta { font-size: 0.8rem; color: var(--text-muted); font-family: var(--font-mono); }
+
+  .hero { padding: 10rem 2rem 6rem; text-align: center; position: relative; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 800px; height: 800px; background: radial-gradient(circle, rgba(79,140,255,0.08) 0%, transparent 70%); pointer-events: none; }
+  .hero .badge { display: inline-block; background: var(--accent-glow); border: 1px solid rgba(79,140,255,0.25); color: var(--accent); font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500; padding: 0.35rem 1rem; border-radius: 100px; margin-bottom: 2rem; letter-spacing: 0.05em; text-transform: uppercase; }
+  .hero h1 { font-family: var(--font-display); font-size: clamp(2.8rem,6vw,5rem); line-height: 1.1; margin-bottom: 1.5rem; }
+  .hero h1 em { font-style: italic; color: var(--accent); }
+  .hero .subtitle { font-size: 1.15rem; color: var(--text-secondary); max-width: 640px; margin: 0 auto 3rem; line-height: 1.8; }
+  .hero-meta { display: flex; gap: 2.5rem; justify-content: center; flex-wrap: wrap; }
+  .hero-meta div { text-align: center; }
+  .hero-meta .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 0.25rem; }
+  .hero-meta .value { font-size: 0.95rem; color: var(--text-secondary); font-weight: 500; }
+
+  .container { max-width: 1120px; margin: 0 auto; padding: 0 2rem; }
+  section { padding: 5rem 0; border-top: 1px solid var(--border-subtle); }
+  .section-label { font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--accent); margin-bottom: 0.75rem; }
+  .section-title { font-family: var(--font-display); font-size: clamp(1.8rem,3.5vw,2.6rem); line-height: 1.2; margin-bottom: 1rem; }
+  .section-desc { color: var(--text-secondary); font-size: 1rem; max-width: 700px; margin-bottom: 3rem; line-height: 1.8; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; transition: all 0.25s; }
+  .card:hover { background: var(--bg-card-hover); border-color: rgba(79,140,255,0.2); transform: translateY(-2px); }
+  .card .icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 1rem; }
+  .card h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.5rem; }
+  .card p { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.7; }
+
+  .diagram-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; margin: 2rem 0; overflow-x: auto; }
+  .diagram-wrap svg { display: block; margin: 0 auto; }
+  .diagram-title { font-family: var(--font-display); font-size: 1.15rem; margin-bottom: 1.5rem; text-align: center; color: var(--text-secondary); }
+
+  .persona-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem; }
+  .persona-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; text-align: center; transition: all 0.25s; }
+  .persona-card:hover { border-color: rgba(79,140,255,0.2); transform: translateY(-2px); }
+  .persona-avatar { width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; }
+  .persona-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.3rem; }
+  .persona-card .role { font-size: 0.75rem; color: var(--accent); font-family: var(--font-mono); margin-bottom: 0.75rem; }
+  .persona-card p { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; }
+  @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+  .two-col .col-text h3 { font-family: var(--font-display); font-size: 1.5rem; margin-bottom: 0.75rem; }
+  .two-col .col-text p { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; margin-bottom: 0.75rem; }
+
+  .sms-mockup { max-width: 380px; margin: 2rem auto; background: #1A1A2E; border-radius: 28px; border: 3px solid #2A2A4A; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.5); }
+  .sms-header { background: #222244; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid #333366; }
+  .sms-header .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-purple)); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; color: #fff; }
+  .sms-header .name { font-weight: 600; font-size: 0.9rem; color: #fff; }
+  .sms-header .carrier { font-size: 0.7rem; color: #8888AA; }
+  .sms-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; min-height: 360px; }
+  .sms-bubble { max-width: 85%; padding: 0.7rem 1rem; border-radius: 16px; font-size: 0.82rem; line-height: 1.55; }
+  .sms-bubble.outbound { background: #3366FF; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+  .sms-bubble.inbound { background: #2A2A4A; color: #E0E0F0; align-self: flex-start; border-bottom-left-radius: 4px; }
+  .sms-time { font-size: 0.65rem; color: #666688; text-align: center; margin: 0.25rem 0; }
+
+  .debounce-diagram { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; margin: 2rem 0; }
+  .debounce-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; font-size: 0.82rem; }
+  .debounce-row .sender { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; width: 70px; text-align: right; flex-shrink: 0; }
+  .debounce-row .bar { height: 32px; border-radius: 6px; display: flex; align-items: center; padding: 0 0.75rem; font-size: 0.78rem; white-space: nowrap; }
+  .debounce-row .time-marker { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); flex-shrink: 0; width: 45px; }
+
+  .highlight-box { background: var(--accent-glow); border-left: 3px solid var(--accent); padding: 1rem 1.25rem; border-radius: 0 8px 8px 0; margin: 1.5rem 0; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.7; }
+  .highlight-box strong { color: var(--text); }
+
+  .schema-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; }
+  .schema-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .schema-card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.75rem; }
+  .schema-card-header .table-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; }
+  .schema-card-header h4 { font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600; }
+  .schema-field { display: flex; justify-content: space-between; padding: 0.4rem 1.25rem; font-size: 0.8rem; transition: background 0.15s; }
+  .schema-field:hover { background: var(--bg-card-hover); }
+  .schema-field .fname { font-family: var(--font-mono); color: var(--text); }
+  .schema-field .fname.pk { color: var(--accent-yellow); }
+  .schema-field .fname.fk { color: var(--accent-purple); }
+  .schema-field .ftype { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); }
+
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+  .metric-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; position: relative; overflow: hidden; }
+  .metric-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .metric-card:nth-child(1)::after{background:var(--accent)}.metric-card:nth-child(2)::after{background:var(--accent-green)}.metric-card:nth-child(3)::after{background:var(--accent-warm)}.metric-card:nth-child(4)::after{background:var(--accent-purple)}.metric-card:nth-child(5)::after{background:var(--accent-yellow)}.metric-card:nth-child(6)::after{background:var(--accent-rose)}.metric-card:nth-child(7)::after{background:var(--accent)}.metric-card:nth-child(8)::after{background:var(--accent-green)}.metric-card:nth-child(9)::after{background:var(--accent-warm)}
+  .metric-value { font-family: var(--font-display); font-size: 2rem; line-height: 1; margin-bottom: 0.3rem; }
+  .metric-label { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; }
+
+  .stack-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; }
+  .stack-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; transition: all 0.2s; }
+  .stack-item:hover { border-color: rgba(79,140,255,0.2); }
+  .stack-item .stack-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+  .stack-item .stack-name { font-size: 0.85rem; font-weight: 600; }
+  .stack-item .stack-detail { font-size: 0.72rem; color: var(--text-muted); }
+
+  .state-flow { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 1.5rem 0; }
+  .state-badge { display: inline-flex; padding: 0.3rem 0.65rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; border: 1px solid; }
+  .state-badge.ingestion{background:rgba(79,140,255,0.1);border-color:rgba(79,140,255,0.25);color:var(--accent)}.state-badge.active{background:rgba(52,211,153,0.1);border-color:rgba(52,211,153,0.25);color:var(--accent-green)}.state-badge.conversion{background:rgba(251,191,36,0.1);border-color:rgba(251,191,36,0.25);color:var(--accent-yellow)}.state-badge.manual{background:rgba(167,139,250,0.1);border-color:rgba(167,139,250,0.25);color:var(--accent-purple)}.state-badge.terminal{background:rgba(251,113,133,0.1);border-color:rgba(251,113,133,0.25);color:var(--accent-rose)}
+
+  .table-wrap { overflow-x: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; }
+  .api-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .api-table th { text-align: left; padding: 0.75rem 1rem; font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--bg-elevated); }
+  .api-table td { padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); }
+  .api-table tr:hover td { background: var(--bg-card-hover); }
+  .method-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; }
+  .method-badge.get{background:rgba(52,211,153,0.15);color:var(--accent-green)}.method-badge.post{background:rgba(79,140,255,0.15);color:var(--accent)}.method-badge.patch{background:rgba(251,191,36,0.15);color:var(--accent-yellow)}
+  .api-path { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text); }
+
+  .timeline { position: relative; padding-left: 2.5rem; }
+  .timeline::before { content: ''; position: absolute; left: 12px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+  .timeline-item { position: relative; margin-bottom: 2rem; padding: 1.25rem 1.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; }
+  .timeline-item::before { content: ''; position: absolute; left: -2.15rem; top: 1.5rem; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent); background: var(--bg); }
+  .timeline-item.done::before { background: var(--accent); }
+  .timeline-item h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.3rem; }
+  .timeline-item .phase-tag { font-family: var(--font-mono); font-size: 0.68rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.5rem; }
+  .timeline-item p { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.7; }
+
+  footer { border-top: 1px solid var(--border-subtle); padding: 3rem 2rem; text-align: center; color: var(--text-muted); font-size: 0.82rem; }
+  footer .footer-brand { font-family: var(--font-display); font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+
+  @media (max-width: 768px) { .hero { padding: 8rem 1.5rem 4rem; } .container { padding: 0 1.25rem; } section { padding: 3.5rem 0; } }
+</style>
+</head>
+<body>
+
+<nav><div class="logo">Atelier <span>V2</span></div><div class="meta">v2.3 · April 2, 2026</div></nav>
+
+<div class="hero">
+  <div class="badge">Product Requirements Document</div>
+  <h1>Outbound Tenant<br><em>Engagement Platform</em></h1>
+  <p class="subtitle">AI-powered SMS concierge that bridges the gap between lead capture on Finn.no and lease signing — automating the middle of the funnel where most leads are lost.</p>
+  <div class="hero-meta">
+    <div><div class="label">Author</div><div class="value">Stay Management AS</div></div>
+    <div><div class="label">Status</div><div class="value">Approved</div></div>
+    <div><div class="label">Version</div><div class="value">2.3</div></div>
+    <div><div class="label">Market</div><div class="value">Bergen, Norway</div></div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- 01 VISION -->
+  <section>
+    <div class="section-label">01 — Vision</div>
+    <div class="section-title">The Property Manager's Workshop</div>
+    <div class="section-desc">"Atelier" — a workshop where craft happens. Leads enter via Finn.no, are scored by AI, and serious leads receive a proactive SMS with a video tour link. An AI concierge named Oline handles the conversation.</div>
+    <div class="card-grid">
+      <div class="card"><div class="icon" style="background:rgba(79,140,255,0.12)">📥</div><h3>Capture</h3><p>Leads from Finn.no / Google Form are ingested, normalized, and deduplicated automatically.</p></div>
+      <div class="card"><div class="icon" style="background:rgba(52,211,153,0.12)">🧠</div><h3>Score</h3><p>AI scores every lead from form data. Only serious leads pass the gate and receive the first SMS.</p></div>
+      <div class="card"><div class="icon" style="background:rgba(255,120,73,0.12)">💬</div><h3>Engage</h3><p>AI concierge handles Q&A via SMS — answering questions, sharing video tours, and pushing Calendly.</p></div>
+      <div class="card"><div class="icon" style="background:rgba(167,139,250,0.12)">🤝</div><h3>Convert</h3><p>Soft commitments collected, units held first-confirmed-wins, then handoff to credit check and contract.</p></div>
+    </div>
+    <div class="highlight-box" style="margin-top:2.5rem"><strong>V1 → V2:</strong> V1 was a web chat sandbox for validating AI prompts. V2 is a production system where AI initiates contact via SMS and the PM observes/intervenes through a dashboard.</div>
+  </section>
+
+  <!-- 02 PIPELINE -->
+  <section>
+    <div class="section-label">02 — Lead-to-Lease Pipeline</div>
+    <div class="section-title">From Form Submission to BankID Signing</div>
+    <div class="section-desc">The complete state machine from lead capture to signed lease. AI scores leads before sending SMS — only serious leads are contacted.</div>
+
+    <!-- ===== LEAD LIFECYCLE SVG DIAGRAM ===== -->
+    <div class="diagram-wrap">
+      <div class="diagram-title">Lead Lifecycle — State Machine</div>
+      <svg viewBox="0 0 780 1580" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:780px;font-family:'Instrument Sans',system-ui,sans-serif">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#4F8CFF"/></marker>
+          <marker id="arrow-muted" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#5C6478"/></marker>
+        </defs>
+        <!-- Start dot -->
+        <circle cx="390" cy="20" r="8" fill="#4F8CFF"/>
+        <line x1="390" y1="28" x2="390" y2="50" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="390" y="44" text-anchor="middle" fill="#8B93A8" font-size="10" dx="60">Finn.no / Google Form</text>
+
+        <!-- LeadIngested -->
+        <rect x="310" y="55" width="160" height="34" rx="6" fill="#2A3A5C" stroke="#4F8CFF" stroke-width="1.5"/>
+        <text x="390" y="77" text-anchor="middle" fill="#E8EAF0" font-size="13" font-weight="600">LeadIngested</text>
+        <line x1="390" y1="89" x2="390" y2="115" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="392" y="108" text-anchor="middle" fill="#8B93A8" font-size="9">AI scores from form data</text>
+
+        <!-- Scored -->
+        <rect x="325" y="120" width="130" height="34" rx="6" fill="#2A3A5C" stroke="#4F8CFF" stroke-width="1.5"/>
+        <text x="390" y="142" text-anchor="middle" fill="#E8EAF0" font-size="13" font-weight="600">Scored</text>
+
+        <!-- Branch: Filtered + PendingCompose -->
+        <line x1="455" y1="137" x2="560" y2="137" stroke="#5C6478" stroke-width="1.2"/>
+        <line x1="560" y1="137" x2="560" y2="175" stroke="#5C6478" stroke-width="1.2" marker-end="url(#arrow-muted)"/>
+        <text x="510" y="130" text-anchor="middle" fill="#FB7185" font-size="9">Score = not serious</text>
+        <rect x="495" y="180" width="130" height="30" rx="6" fill="#1E2330" stroke="#FB7185" stroke-width="1.2"/>
+        <text x="560" y="200" text-anchor="middle" fill="#FB7185" font-size="12">Filtered</text>
+
+        <!-- Filtered → PendingCompose override -->
+        <line x1="560" y1="210" x2="560" y2="250" stroke="#A78BFA" stroke-width="1.2" stroke-dasharray="4,3"/>
+        <line x1="560" y1="250" x2="430" y2="250" stroke="#A78BFA" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <text x="560" y="238" text-anchor="middle" fill="#A78BFA" font-size="9">Employee override</text>
+
+        <line x1="390" y1="154" x2="390" y2="232" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="340" y="195" text-anchor="middle" fill="#34D399" font-size="9">Score = serious</text>
+
+        <!-- PendingCompose -->
+        <rect x="300" y="237" width="160" height="34" rx="6" fill="#2A3A5C" stroke="#4F8CFF" stroke-width="1.5"/>
+        <text x="380" y="259" text-anchor="middle" fill="#E8EAF0" font-size="12" font-weight="600">PendingCompose</text>
+        <line x1="380" y1="271" x2="380" y2="305" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="382" y="293" text-anchor="middle" fill="#8B93A8" font-size="9">Template + SMS sent</text>
+
+        <!-- Sending -->
+        <rect x="315" y="310" width="130" height="34" rx="6" fill="#2A3A5C" stroke="#4F8CFF" stroke-width="1.5"/>
+        <text x="380" y="332" text-anchor="middle" fill="#E8EAF0" font-size="13" font-weight="600">Sending</text>
+
+        <!-- SendFailed loop -->
+        <line x1="445" y1="327" x2="540" y2="327" stroke="#FB7185" stroke-width="1.2"/>
+        <rect x="540" y="312" width="110" height="30" rx="6" fill="#1E2330" stroke="#FB7185" stroke-width="1.2"/>
+        <text x="595" y="332" text-anchor="middle" fill="#FB7185" font-size="11">SendFailed</text>
+        <text x="490" y="320" text-anchor="middle" fill="#FB7185" font-size="9">Delivery failed</text>
+        <path d="M595,342 L595,358 L445,358 L445,344" fill="none" stroke="#FBBF24" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <text x="520" y="370" text-anchor="middle" fill="#FBBF24" font-size="9">Retry (max 3)</text>
+
+        <line x1="380" y1="344" x2="380" y2="385" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="330" y="370" text-anchor="middle" fill="#34D399" font-size="9">Delivered</text>
+
+        <!-- FirstMessageSent -->
+        <rect x="290" y="390" width="180" height="34" rx="6" fill="#1E3A2A" stroke="#34D399" stroke-width="1.5"/>
+        <text x="380" y="412" text-anchor="middle" fill="#34D399" font-size="12" font-weight="600">FirstMessageSent</text>
+
+        <!-- Branches from FirstMessageSent -->
+        <!-- HasQuestions -->
+        <line x1="290" y1="407" x2="160" y2="407" stroke="#4F8CFF" stroke-width="1.2"/>
+        <line x1="160" y1="407" x2="160" y2="455" stroke="#4F8CFF" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="220" y="400" text-anchor="middle" fill="#8B93A8" font-size="9">Asks questions</text>
+        <rect x="90" y="460" width="140" height="30" rx="6" fill="#2A3A5C" stroke="#4F8CFF" stroke-width="1.5"/>
+        <text x="160" y="480" text-anchor="middle" fill="#E8EAF0" font-size="12" font-weight="600">HasQuestions</text>
+
+        <!-- AIAnswering -->
+        <line x1="160" y1="490" x2="160" y2="525" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="162" y="514" text-anchor="middle" fill="#8B93A8" font-size="9">AI uses Fundament</text>
+        <rect x="90" y="530" width="140" height="30" rx="6" fill="#2A3A5C" stroke="#4F8CFF" stroke-width="1.5"/>
+        <text x="160" y="550" text-anchor="middle" fill="#E8EAF0" font-size="12" font-weight="600">AIAnswering</text>
+        <!-- Loop back -->
+        <path d="M90,545 L60,545 L60,475 L90,475" fill="none" stroke="#8B93A8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow-muted)"/>
+        <text x="45" y="510" text-anchor="middle" fill="#5C6478" font-size="8" transform="rotate(-90,45,510)">More Q</text>
+
+        <!-- BookedCalendly -->
+        <line x1="380" y1="424" x2="380" y2="455" stroke="#4F8CFF" stroke-width="1.2"/>
+        <line x1="230" y1="545" x2="310" y2="545" stroke="#4F8CFF" stroke-width="1.2"/>
+        <!-- merge both paths to BookedCalendly -->
+        <rect x="310" y="458" width="170" height="30" rx="6" fill="#2A3A5C" stroke="#FBBF24" stroke-width="1.5"/>
+        <text x="395" y="478" text-anchor="middle" fill="#FBBF24" font-size="12" font-weight="600">BookedCalendly</text>
+        <text x="380" y="450" text-anchor="middle" fill="#8B93A8" font-size="9">Books Calendly call</text>
+
+        <!-- CallCompleted -->
+        <line x1="395" y1="488" x2="395" y2="530" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="397" y="516" text-anchor="middle" fill="#8B93A8" font-size="9">Digital meeting held</text>
+        <rect x="310" y="535" width="170" height="30" rx="6" fill="#2A3A5C" stroke="#FBBF24" stroke-width="1.5"/>
+        <text x="395" y="555" text-anchor="middle" fill="#FBBF24" font-size="12" font-weight="600">CallCompleted</text>
+
+        <!-- OptedOut (from FirstMessageSent) -->
+        <line x1="470" y1="407" x2="620" y2="407" stroke="#FB7185" stroke-width="1.2"/>
+        <line x1="620" y1="407" x2="620" y2="455" stroke="#FB7185" stroke-width="1.2" marker-end="url(#arrow-muted)"/>
+        <text x="550" y="400" text-anchor="middle" fill="#FB7185" font-size="9">STOP</text>
+        <rect x="560" y="460" width="120" height="30" rx="6" fill="#1E2330" stroke="#FB7185" stroke-width="1.2"/>
+        <text x="620" y="480" text-anchor="middle" fill="#FB7185" font-size="12">OptedOut</text>
+        <text x="620" y="506" text-anchor="middle" fill="#5C6478" font-size="9">→ Suppression list</text>
+
+        <!-- WantsPhysical (from CallCompleted) -->
+        <line x1="480" y1="550" x2="620" y2="550" stroke="#A78BFA" stroke-width="1.2"/>
+        <line x1="620" y1="550" x2="620" y2="590" stroke="#A78BFA" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="555" y="543" text-anchor="middle" fill="#A78BFA" font-size="9">Wants physical</text>
+        <rect x="545" y="595" width="150" height="30" rx="6" fill="#1E2330" stroke="#A78BFA" stroke-width="1.5"/>
+        <text x="620" y="615" text-anchor="middle" fill="#A78BFA" font-size="12" font-weight="600">WantsPhysical</text>
+
+        <!-- ManualIntervention -->
+        <line x1="620" y1="625" x2="620" y2="660" stroke="#A78BFA" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="622" y="650" text-anchor="middle" fill="#8B93A8" font-size="8">AI: we'll get back</text>
+        <rect x="525" y="665" width="190" height="30" rx="6" fill="#1E2330" stroke="#A78BFA" stroke-width="1.5"/>
+        <text x="620" y="685" text-anchor="middle" fill="#A78BFA" font-size="11" font-weight="600">ManualIntervention</text>
+
+        <!-- PMTakeover -->
+        <line x1="620" y1="695" x2="620" y2="730" stroke="#A78BFA" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="545" y="735" width="150" height="30" rx="6" fill="#1E2330" stroke="#A78BFA" stroke-width="1.5"/>
+        <text x="620" y="755" text-anchor="middle" fill="#A78BFA" font-size="12" font-weight="600">PMTakeover</text>
+
+        <!-- WantsToRent (central) -->
+        <line x1="395" y1="565" x2="395" y2="620" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <!-- Also from AIAnswering -->
+        <line x1="160" y1="560" x2="160" y2="630" stroke="#4F8CFF" stroke-width="1.2"/>
+        <line x1="160" y1="630" x2="315" y2="630" stroke="#4F8CFF" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="395" y="608" text-anchor="middle" fill="#34D399" font-size="9">Decides to rent</text>
+        <rect x="315" y="622" width="160" height="34" rx="6" fill="#1E3A2A" stroke="#34D399" stroke-width="1.5"/>
+        <text x="395" y="644" text-anchor="middle" fill="#34D399" font-size="13" font-weight="600">WantsToRent</text>
+
+        <!-- SoftCommitment -->
+        <line x1="395" y1="656" x2="395" y2="695" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="397" y="682" text-anchor="middle" fill="#8B93A8" font-size="9">AI presents terms</text>
+        <rect x="305" y="700" width="180" height="34" rx="6" fill="#2A3A5C" stroke="#FBBF24" stroke-width="1.5"/>
+        <text x="395" y="722" text-anchor="middle" fill="#FBBF24" font-size="13" font-weight="600">SoftCommitment</text>
+
+        <!-- Confirmed -->
+        <line x1="350" y1="734" x2="300" y2="780" stroke="#34D399" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="300" y="760" text-anchor="middle" fill="#34D399" font-size="9">Confirms yes</text>
+        <rect x="225" y="785" width="140" height="34" rx="6" fill="#1E3A2A" stroke="#34D399" stroke-width="1.5"/>
+        <text x="295" y="807" text-anchor="middle" fill="#34D399" font-size="13" font-weight="600">Confirmed</text>
+
+        <!-- Lost (from SoftCommitment) -->
+        <line x1="440" y1="734" x2="500" y2="780" stroke="#FB7185" stroke-width="1.2" marker-end="url(#arrow-muted)"/>
+        <text x="495" y="760" text-anchor="middle" fill="#FB7185" font-size="9">Says no</text>
+
+        <!-- UnitHeld -->
+        <line x1="295" y1="819" x2="295" y2="860" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="297" y="845" text-anchor="middle" fill="#8B93A8" font-size="9">First-confirmed-wins</text>
+        <rect x="230" y="865" width="130" height="30" rx="6" fill="#2A3A5C" stroke="#4F8CFF" stroke-width="1.5"/>
+        <text x="295" y="885" text-anchor="middle" fill="#E8EAF0" font-size="12" font-weight="600">UnitHeld</text>
+
+        <!-- CreditCheck -->
+        <line x1="295" y1="895" x2="295" y2="930" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="297" y="918" text-anchor="middle" fill="#8B93A8" font-size="9">Philippines team</text>
+        <rect x="225" y="935" width="140" height="30" rx="6" fill="#2A3A5C" stroke="#4F8CFF" stroke-width="1.5"/>
+        <text x="295" y="955" text-anchor="middle" fill="#E8EAF0" font-size="12" font-weight="600">CreditCheck</text>
+
+        <!-- CreditCheck → Lost -->
+        <line x1="365" y1="950" x2="500" y2="950" stroke="#FB7185" stroke-width="1.2"/>
+        <text x="435" y="943" text-anchor="middle" fill="#FB7185" font-size="9">Fail</text>
+
+        <!-- ContractSent -->
+        <line x1="295" y1="965" x2="295" y2="1005" stroke="#34D399" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="297" y="990" text-anchor="middle" fill="#34D399" font-size="9">Pass (Hybel.no)</text>
+        <rect x="220" y="1010" width="150" height="30" rx="6" fill="#1E3A2A" stroke="#34D399" stroke-width="1.5"/>
+        <text x="295" y="1030" text-anchor="middle" fill="#34D399" font-size="12" font-weight="600">ContractSent</text>
+
+        <!-- Signed -->
+        <line x1="295" y1="1040" x2="295" y2="1080" stroke="#34D399" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="297" y="1065" text-anchor="middle" fill="#8B93A8" font-size="9">BankID signing</text>
+        <rect x="230" y="1085" width="130" height="34" rx="8" fill="#34D399" stroke="#34D399" stroke-width="1.5"/>
+        <text x="295" y="1107" text-anchor="middle" fill="#0C0E12" font-size="13" font-weight="700">Signed ✓</text>
+
+        <!-- PMTakeover → Signed / Lost -->
+        <line x1="620" y1="765" x2="620" y2="1000" stroke="#A78BFA" stroke-width="1.2"/>
+        <line x1="620" y1="1000" x2="425" y2="1095" stroke="#34D399" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="540" y="1040" text-anchor="middle" fill="#34D399" font-size="9">Leased</text>
+
+        <!-- Lost block -->
+        <rect x="480" y="785" width="100" height="30" rx="6" fill="#1E2330" stroke="#FB7185" stroke-width="1.5"/>
+        <text x="530" y="805" text-anchor="middle" fill="#FB7185" font-size="12" font-weight="600">Lost</text>
+        <line x1="530" y1="815" x2="530" y2="850" stroke="#FB7185" stroke-width="1" marker-end="url(#arrow-muted)"/>
+        <text x="530" y="865" text-anchor="middle" fill="#5C6478" font-size="9">→ Closed</text>
+
+        <!-- End dot -->
+        <circle cx="295" cy="1140" r="8" fill="#4F8CFF"/>
+        <circle cx="295" cy="1140" r="4" fill="#0C0E12"/>
+      </svg>
+    </div>
+
+    <h3 style="font-family:var(--font-display);font-size:1.25rem;margin:2.5rem 0 1rem">Flow State Enum</h3>
+    <div class="state-flow">
+      <span class="state-badge ingestion">lead_ingested</span><span class="state-badge ingestion">filtered</span><span class="state-badge ingestion">pending_compose</span><span class="state-badge ingestion">sending</span>
+      <span class="state-badge active">first_message_sent</span><span class="state-badge active">has_questions</span><span class="state-badge active">booked_calendly</span><span class="state-badge active">call_completed</span>
+      <span class="state-badge conversion">wants_to_rent</span><span class="state-badge conversion">soft_commitment</span><span class="state-badge conversion">confirmed</span><span class="state-badge conversion">unit_held</span><span class="state-badge conversion">credit_check</span><span class="state-badge conversion">contract_sent</span>
+      <span class="state-badge manual">wants_physical</span><span class="state-badge manual">manual_intervention</span><span class="state-badge manual">pm_takeover</span>
+      <span class="state-badge terminal">signed</span><span class="state-badge terminal">lost</span><span class="state-badge terminal">opted_out</span>
+    </div>
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:0.75rem;font-size:0.72rem;color:var(--text-muted)">
+      <span>🔵 Ingestion</span><span>🟢 Active</span><span>🟡 Conversion</span><span>🟣 Manual</span><span>🔴 Terminal</span>
+    </div>
+  </section>
+
+  <!-- 03 PERSONAS -->
+  <section>
+    <div class="section-label">03 — User Personas</div>
+    <div class="section-title">Who Uses Atelier</div>
+    <div class="section-desc">Four distinct personas interact with the system, each with a different interface.</div>
+    <div class="persona-grid">
+      <div class="persona-card"><div class="persona-avatar" style="background:rgba(79,140,255,0.12)">🏢</div><h3>Property Manager</h3><div class="role">Primary · PM Dashboard</div><p>Manages 10–50 listings across Bergen. Monitors AI conversations, overrides when needed.</p></div>
+      <div class="persona-card"><div class="persona-avatar" style="background:rgba(52,211,153,0.12)">🌏</div><h3>Philippines Ops</h3><div class="role">Operations · Manual Steps</div><p>Handles credit checks, Hybel.no contracts, BankID signing. Receives handoffs at confirmed state.</p></div>
+      <div class="persona-card"><div class="persona-avatar" style="background:rgba(255,120,73,0.12)">📱</div><h3>Tenant</h3><div class="role">End User · SMS Only</div><p>Finds listing on Finn.no, fills interest form. Interacts entirely via SMS with the AI concierge.</p></div>
+      <div class="persona-card"><div class="persona-avatar" style="background:rgba(167,139,250,0.12)">⚙️</div><h3>Stay Admin</h3><div class="role">Admin · Full Access</div><p>Oversees all properties. Reviews false negatives, configures thresholds, tracks metrics.</p></div>
+    </div>
+  </section>
+
+  <!-- 04 SMS EXPERIENCE -->
+  <section>
+    <div class="section-label">04 — SMS Experience</div>
+    <div class="section-title">Natural Conversation via SMS</div>
+    <div class="two-col">
+      <div class="col-text">
+        <h3>Debounce-Based Replies</h3>
+        <p>Unlike rigid chatbots, Atelier mimics real human texting. When a tenant sends a message, a 30-second timer starts. More messages reset it. When it fires, the AI responds to everything at once.</p>
+        <p>Hard cap: if the first unresponded message is older than 2 minutes, respond immediately.</p>
+        <div class="debounce-diagram">
+          <div class="debounce-row"><span class="sender" style="color:var(--accent-green)">Tenant</span><span class="time-marker">0:00</span><span class="bar" style="background:rgba(52,211,153,0.15);color:var(--accent-green);width:180px">"Is it available?"</span></div>
+          <div class="debounce-row"><span class="sender" style="color:var(--accent-green)">Tenant</span><span class="time-marker">0:08</span><span class="bar" style="background:rgba(52,211,153,0.15);color:var(--accent-green);width:140px">"Also pets?"</span></div>
+          <div class="debounce-row"><span class="sender" style="color:var(--accent-green)">Tenant</span><span class="time-marker">0:15</span><span class="bar" style="background:rgba(52,211,153,0.15);color:var(--accent-green);width:140px">"What floor?"</span></div>
+          <div class="debounce-row"><span class="sender" style="color:var(--text-muted)">⏱️</span><span class="time-marker">0:45</span><span class="bar" style="background:rgba(79,140,255,0.08);color:var(--text-muted);width:200px;border:1px dashed var(--border)">30s debounce fires</span></div>
+          <div class="debounce-row"><span class="sender" style="color:var(--accent)">Oline</span><span class="time-marker">0:47</span><span class="bar" style="background:rgba(79,140,255,0.15);color:var(--accent);width:300px">"Hei! Ja, 3. etasje, dyr tillatt..."</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="sms-mockup">
+          <div class="sms-header"><div class="avatar">O</div><div><div class="name">Stay Utleie</div><div class="carrier">SMS · +47 XXX XX XXX</div></div></div>
+          <div class="sms-body">
+            <div class="sms-bubble outbound">Hei Maria! Takk for at du er interessert i Nygårdsgaten 94. Sjekk videoomvisningen: stay.no/tour/ng94 📹 Book en samtale: calendly.com/leasing-stay/15min</div>
+            <div class="sms-time">14:32</div>
+            <div class="sms-bubble inbound">Hei! Fin leilighet. Når kan jeg flytte inn?</div>
+            <div class="sms-bubble inbound">Og er internett inkludert?</div>
+            <div class="sms-time">14:35</div>
+            <div class="sms-bubble outbound">Leiligheten er ledig fra 1. april. Ja, internett er inkludert i leien. Vil du booke en samtale?</div>
+            <div class="sms-time">14:36</div>
+            <div class="sms-bubble inbound">Ja, det høres bra ut! Jeg leier 😊</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="highlight-box" style="margin-top:2rem"><strong>SMS constraints:</strong> Max 320 chars/response (2 segments). Two-layer enforcement: max_tokens (~80 tokens) + sentence-boundary truncation. Norwegian chars (å, ø, æ) in GSM basic set — no encoding penalty.</div>
+  </section>
+
+  <!-- 05 ARCHITECTURE -->
+  <section>
+    <div class="section-label">05 — System Architecture</div>
+    <div class="section-title">Channel-Agnostic Design</div>
+    <div class="section-desc">SMS today, extensible to WhatsApp/email tomorrow. The channel adapter pattern keeps AI logic decoupled from delivery.</div>
+
+    <!-- ===== SYSTEM ARCHITECTURE SVG ===== -->
+    <div class="diagram-wrap">
+      <div class="diagram-title">System Architecture</div>
+      <svg viewBox="0 0 820 520" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:820px;font-family:'Instrument Sans',system-ui,sans-serif">
+        <defs>
+          <marker id="a2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#4F8CFF"/></marker>
+        </defs>
+
+        <!-- Lead Ingestion box -->
+        <rect x="10" y="10" width="230" height="130" rx="10" fill="none" stroke="#4F8CFF" stroke-width="1.5" stroke-dasharray="6,3"/>
+        <text x="20" y="30" fill="#4F8CFF" font-size="10" font-weight="600" text-transform="uppercase" letter-spacing="1">LEAD INGESTION</text>
+        <rect x="30" y="42" width="180" height="28" rx="5" fill="#2A3A5C" stroke="#4F8CFF" stroke-width="1"/>
+        <text x="120" y="61" text-anchor="middle" fill="#E8EAF0" font-size="11">Finn.no / Google Form</text>
+        <line x1="120" y1="70" x2="120" y2="88" stroke="#4F8CFF" stroke-width="1" marker-end="url(#a2)"/>
+        <rect x="30" y="92" width="180" height="28" rx="5" fill="#2A3A5C" stroke="#4F8CFF" stroke-width="1"/>
+        <text x="120" y="111" text-anchor="middle" fill="#E8EAF0" font-size="11">Apps Script + HMAC</text>
+
+        <!-- Arrow to Backend -->
+        <line x1="240" y1="106" x2="290" y2="106" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#a2)"/>
+        <text x="265" y="100" text-anchor="middle" fill="#8B93A8" font-size="8">POST</text>
+
+        <!-- Backend Processing box -->
+        <rect x="295" y="10" width="230" height="200" rx="10" fill="none" stroke="#FBBF24" stroke-width="1.5" stroke-dasharray="6,3"/>
+        <text x="305" y="30" fill="#FBBF24" font-size="10" font-weight="600">BACKEND PROCESSING</text>
+        <rect x="315" y="42" width="190" height="28" rx="5" fill="#2A3A5C" stroke="#FBBF24" stroke-width="1"/>
+        <text x="410" y="61" text-anchor="middle" fill="#E8EAF0" font-size="11">Atelier Backend</text>
+        <rect x="315" y="80" width="190" height="28" rx="5" fill="#2A3A5C" stroke="#34D399" stroke-width="1"/>
+        <text x="410" y="99" text-anchor="middle" fill="#34D399" font-size="11">AI Scoring (Sonnet)</text>
+        <rect x="315" y="118" width="190" height="28" rx="5" fill="#2A3A5C" stroke="#FF7849" stroke-width="1"/>
+        <text x="410" y="137" text-anchor="middle" fill="#FF7849" font-size="11">AI Chat (Haiku)</text>
+        <rect x="315" y="156" width="90" height="28" rx="5" fill="#2A3A5C" stroke="#A78BFA" stroke-width="1"/>
+        <text x="360" y="175" text-anchor="middle" fill="#A78BFA" font-size="11">MCP Tools</text>
+        <rect x="415" y="156" width="90" height="28" rx="5" fill="#2A3A5C" stroke="#A78BFA" stroke-width="1"/>
+        <text x="460" y="175" text-anchor="middle" fill="#A78BFA" font-size="11">Postgres</text>
+
+        <!-- Channel Layer box -->
+        <rect x="295" y="230" width="230" height="130" rx="10" fill="none" stroke="#FF7849" stroke-width="1.5" stroke-dasharray="6,3"/>
+        <text x="305" y="250" fill="#FF7849" font-size="10" font-weight="600">CHANNEL LAYER</text>
+        <rect x="315" y="262" width="190" height="28" rx="5" fill="#2A3A5C" stroke="#FF7849" stroke-width="1"/>
+        <text x="410" y="281" text-anchor="middle" fill="#E8EAF0" font-size="11">Channel Adapter</text>
+        <rect x="315" y="300" width="90" height="28" rx="5" fill="#2A3A5C" stroke="#FF7849" stroke-width="1"/>
+        <text x="360" y="319" text-anchor="middle" fill="#FF7849" font-size="10">Pling SMS</text>
+        <rect x="415" y="300" width="90" height="28" rx="5" fill="#1E2330" stroke="#A78BFA" stroke-width="1"/>
+        <text x="460" y="319" text-anchor="middle" fill="#A78BFA" font-size="10">Simulator</text>
+        <line x1="410" y1="210" x2="410" y2="230" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#a2)"/>
+
+        <!-- Tenant Phone -->
+        <rect x="295" y="385" width="230" height="36" rx="8" fill="#1E3A2A" stroke="#34D399" stroke-width="1.5"/>
+        <text x="410" y="408" text-anchor="middle" fill="#34D399" font-size="13" font-weight="600">📱 Tenant Phone</text>
+        <line x1="410" y1="360" x2="410" y2="385" stroke="#34D399" stroke-width="1.5" marker-end="url(#a2)"/>
+        <!-- Inbound -->
+        <path d="M350,385 L350,370 L350,365" fill="none" stroke="#8B93A8" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="335" y="375" text-anchor="end" fill="#5C6478" font-size="8">inbound</text>
+
+        <!-- PM Dashboard box -->
+        <rect x="570" y="10" width="230" height="160" rx="10" fill="none" stroke="#FB7185" stroke-width="1.5" stroke-dasharray="6,3"/>
+        <text x="580" y="30" fill="#FB7185" font-size="10" font-weight="600">PM DASHBOARD</text>
+        <rect x="590" y="42" width="190" height="28" rx="5" fill="#2A3A5C" stroke="#FB7185" stroke-width="1"/>
+        <text x="685" y="61" text-anchor="middle" fill="#E8EAF0" font-size="11">Next.js 16 (React 19)</text>
+        <rect x="590" y="80" width="190" height="28" rx="5" fill="#2A3A5C" stroke="#FB7185" stroke-width="1"/>
+        <text x="685" y="99" text-anchor="middle" fill="#E8EAF0" font-size="11">Attention Queue</text>
+        <rect x="590" y="118" width="190" height="28" rx="5" fill="#2A3A5C" stroke="#FB7185" stroke-width="1"/>
+        <text x="685" y="137" text-anchor="middle" fill="#E8EAF0" font-size="11">Takeover Controls</text>
+
+        <!-- Arrow Dashboard → Backend -->
+        <line x1="570" y1="80" x2="525" y2="60" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#a2)"/>
+        <text x="555" y="62" text-anchor="middle" fill="#8B93A8" font-size="8">JWT</text>
+
+        <!-- Sequence diagram label -->
+        <rect x="570" y="200" width="230" height="220" rx="10" fill="none" stroke="#34D399" stroke-width="1.5" stroke-dasharray="6,3"/>
+        <text x="580" y="220" fill="#34D399" font-size="10" font-weight="600">SMS SIMULATOR (DEV)</text>
+        <rect x="590" y="235" width="190" height="24" rx="4" fill="#1E2330" stroke="#5C6478" stroke-width="1"/>
+        <text x="685" y="252" text-anchor="middle" fill="#8B93A8" font-size="10">1. Atelier → Rova</text>
+        <rect x="590" y="267" width="190" height="24" rx="4" fill="#1E2330" stroke="#5C6478" stroke-width="1"/>
+        <text x="685" y="284" text-anchor="middle" fill="#8B93A8" font-size="10">2. Rova shows in UI</text>
+        <rect x="590" y="299" width="190" height="24" rx="4" fill="#1E2330" stroke="#5C6478" stroke-width="1"/>
+        <text x="685" y="316" text-anchor="middle" fill="#8B93A8" font-size="10">3. Tenant types reply</text>
+        <rect x="590" y="331" width="190" height="24" rx="4" fill="#1E2330" stroke="#5C6478" stroke-width="1"/>
+        <text x="685" y="348" text-anchor="middle" fill="#8B93A8" font-size="10">4. Rova → Atelier inbound</text>
+        <rect x="590" y="363" width="190" height="24" rx="4" fill="#1E2330" stroke="#5C6478" stroke-width="1"/>
+        <text x="685" y="380" text-anchor="middle" fill="#8B93A8" font-size="10">5. Debounce 30s → AI reply</text>
+        <rect x="590" y="395" width="190" height="16" rx="4" fill="none" stroke="none"/>
+        <text x="685" y="407" text-anchor="middle" fill="#5C6478" font-size="9">SMS_CHANNEL_MODE=simulator</text>
+
+        <!-- Key -->
+        <text x="20" y="180" fill="#5C6478" font-size="9">Dashed borders = subsystem boundaries</text>
+        <text x="20" y="195" fill="#5C6478" font-size="9">Colors match component types</text>
+      </svg>
+    </div>
+
+    <!-- Sequence diagram: SMS Simulator -->
+    <div class="diagram-wrap">
+      <div class="diagram-title">SMS Simulator — Sequence Flow</div>
+      <svg viewBox="0 0 740 340" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:740px;font-family:'Instrument Sans',system-ui,sans-serif">
+        <defs><marker id="a3" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#4F8CFF"/></marker></defs>
+
+        <!-- Lifelines -->
+        <rect x="50" y="10" width="100" height="28" rx="5" fill="#2A3A5C" stroke="#4F8CFF" stroke-width="1.2"/>
+        <text x="100" y="29" text-anchor="middle" fill="#E8EAF0" font-size="11" font-weight="600">Google Form</text>
+        <line x1="100" y1="38" x2="100" y2="320" stroke="#262C3A" stroke-width="1" stroke-dasharray="4,3"/>
+
+        <rect x="220" y="10" width="120" height="28" rx="5" fill="#2A3A5C" stroke="#FBBF24" stroke-width="1.2"/>
+        <text x="280" y="29" text-anchor="middle" fill="#E8EAF0" font-size="11" font-weight="600">Atelier Backend</text>
+        <line x1="280" y1="38" x2="280" y2="320" stroke="#262C3A" stroke-width="1" stroke-dasharray="4,3"/>
+
+        <rect x="420" y="10" width="120" height="28" rx="5" fill="#2A3A5C" stroke="#34D399" stroke-width="1.2"/>
+        <text x="480" y="29" text-anchor="middle" fill="#E8EAF0" font-size="11" font-weight="600">Rova Backend</text>
+        <line x1="480" y1="38" x2="480" y2="320" stroke="#262C3A" stroke-width="1" stroke-dasharray="4,3"/>
+
+        <rect x="610" y="10" width="110" height="28" rx="5" fill="#2A3A5C" stroke="#A78BFA" stroke-width="1.2"/>
+        <text x="665" y="29" text-anchor="middle" fill="#E8EAF0" font-size="11" font-weight="600">Simulator UI</text>
+        <line x1="665" y1="38" x2="665" y2="320" stroke="#262C3A" stroke-width="1" stroke-dasharray="4,3"/>
+
+        <!-- Messages -->
+        <line x1="100" y1="70" x2="280" y2="70" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#a3)"/>
+        <text x="190" y="64" text-anchor="middle" fill="#E8EAF0" font-size="10">Lead ingested</text>
+
+        <!-- Self: Score -->
+        <path d="M280,95 L310,95 L310,115 L280,115" fill="none" stroke="#FBBF24" stroke-width="1.2" marker-end="url(#a3)"/>
+        <text x="335" y="109" fill="#FBBF24" font-size="10">Score lead</text>
+
+        <line x1="280" y1="140" x2="480" y2="140" stroke="#34D399" stroke-width="1.5" marker-end="url(#a3)"/>
+        <text x="380" y="134" text-anchor="middle" fill="#E8EAF0" font-size="10">POST /api/sms/simulator</text>
+
+        <line x1="480" y1="170" x2="665" y2="170" stroke="#A78BFA" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#a3)"/>
+        <text x="572" y="164" text-anchor="middle" fill="#8B93A8" font-size="10">Polling picks up message</text>
+
+        <line x1="665" y1="200" x2="480" y2="200" stroke="#FF7849" stroke-width="1.5" marker-end="url(#a3)"/>
+        <text x="572" y="194" text-anchor="middle" fill="#E8EAF0" font-size="10">Tenant types reply</text>
+
+        <line x1="480" y1="230" x2="280" y2="230" stroke="#4F8CFF" stroke-width="1.5" marker-end="url(#a3)"/>
+        <text x="380" y="224" text-anchor="middle" fill="#E8EAF0" font-size="10">POST /api/channels/sms/inbound</text>
+
+        <!-- Self: Debounce -->
+        <path d="M280,255 L310,255 L310,275 L280,275" fill="none" stroke="#FBBF24" stroke-width="1.2" marker-end="url(#a3)"/>
+        <text x="355" y="269" fill="#FBBF24" font-size="10">Debounce 30s + AI</text>
+
+        <line x1="280" y1="300" x2="480" y2="300" stroke="#34D399" stroke-width="1.5" marker-end="url(#a3)"/>
+        <text x="380" y="294" text-anchor="middle" fill="#E8EAF0" font-size="10">POST /api/sms/simulator (reply)</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- 06 DATA MODEL -->
+  <section>
+    <div class="section-label">06 — Data Model</div>
+    <div class="section-title">PostgreSQL Schema</div>
+    <div class="section-desc">Four core tables power the system — conversations, messages, scores, and the audit log.</div>
+
+    <!-- ER Diagram SVG -->
+    <div class="diagram-wrap">
+      <div class="diagram-title">Entity Relationships</div>
+      <svg viewBox="0 0 700 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;font-family:'Instrument Sans',system-ui,sans-serif">
+        <!-- Conversations (center) -->
+        <rect x="240" y="80" width="180" height="80" rx="8" fill="#2A3A5C" stroke="#4F8CFF" stroke-width="2"/>
+        <text x="330" y="105" text-anchor="middle" fill="#FBBF24" font-size="14" font-weight="700">conversations</text>
+        <text x="330" y="122" text-anchor="middle" fill="#8B93A8" font-size="10">id, phone, flow_state</text>
+        <text x="330" y="136" text-anchor="middle" fill="#8B93A8" font-size="10">score, listing_snapshot</text>
+        <text x="330" y="150" text-anchor="middle" fill="#5C6478" font-size="9">UNIQUE(phone, listing_id)</text>
+
+        <!-- Messages (left) -->
+        <rect x="10" y="10" width="160" height="60" rx="8" fill="#2A3A5C" stroke="#34D399" stroke-width="1.5"/>
+        <text x="90" y="32" text-anchor="middle" fill="#34D399" font-size="13" font-weight="600">messages</text>
+        <text x="90" y="50" text-anchor="middle" fill="#8B93A8" font-size="10">role, content, delivery</text>
+        <line x1="170" y1="40" x2="240" y2="100" stroke="#4F8CFF" stroke-width="1.5"/>
+        <text x="195" y="60" text-anchor="middle" fill="#5C6478" font-size="9">1:N</text>
+
+        <!-- Scores (left bottom) -->
+        <rect x="10" y="170" width="160" height="60" rx="8" fill="#2A3A5C" stroke="#FBBF24" stroke-width="1.5"/>
+        <text x="90" y="192" text-anchor="middle" fill="#FBBF24" font-size="13" font-weight="600">scores</text>
+        <text x="90" y="210" text-anchor="middle" fill="#8B93A8" font-size="10">type, score, red_flags</text>
+        <line x1="170" y1="200" x2="240" y2="140" stroke="#4F8CFF" stroke-width="1.5"/>
+        <text x="195" y="180" text-anchor="middle" fill="#5C6478" font-size="9">1:N</text>
+
+        <!-- Audit (right) -->
+        <rect x="500" y="90" width="170" height="60" rx="8" fill="#2A3A5C" stroke="#A78BFA" stroke-width="1.5"/>
+        <text x="585" y="112" text-anchor="middle" fill="#A78BFA" font-size="13" font-weight="600">audit_log</text>
+        <text x="585" y="130" text-anchor="middle" fill="#8B93A8" font-size="10">actor, action, details</text>
+        <line x1="420" y1="120" x2="500" y2="120" stroke="#4F8CFF" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="460" y="112" text-anchor="middle" fill="#5C6478" font-size="9">0:N</text>
+      </svg>
+    </div>
+
+    <div class="schema-grid">
+      <div class="schema-card"><div class="schema-card-header"><div class="table-icon" style="background:rgba(79,140,255,0.12);color:var(--accent)">📋</div><h4>conversations</h4></div><div class="schema-fields"><div class="schema-field"><span class="fname pk">id</span><span class="ftype">UUID PK</span></div><div class="schema-field"><span class="fname">tenant_name</span><span class="ftype">TEXT</span></div><div class="schema-field"><span class="fname">phone</span><span class="ftype">TEXT NOT NULL (E.164)</span></div><div class="schema-field"><span class="fname">flow_state</span><span class="ftype">ENUM (20 states)</span></div><div class="schema-field"><span class="fname">preliminary_score</span><span class="ftype">INT (0-100)</span></div><div class="schema-field"><span class="fname">listing_snapshot</span><span class="ftype">JSONB</span></div></div></div>
+      <div class="schema-card"><div class="schema-card-header"><div class="table-icon" style="background:rgba(52,211,153,0.12);color:var(--accent-green)">💬</div><h4>messages</h4></div><div class="schema-fields"><div class="schema-field"><span class="fname pk">id</span><span class="ftype">UUID PK</span></div><div class="schema-field"><span class="fname fk">conversation_id</span><span class="ftype">UUID FK</span></div><div class="schema-field"><span class="fname">role</span><span class="ftype">ENUM: tenant|assistant|pm</span></div><div class="schema-field"><span class="fname">delivery_status</span><span class="ftype">ENUM</span></div><div class="schema-field"><span class="fname">external_id</span><span class="ftype">TEXT (Pling ID)</span></div><div class="schema-field"><span class="fname">metadata</span><span class="ftype">JSONB</span></div></div></div>
+      <div class="schema-card"><div class="schema-card-header"><div class="table-icon" style="background:rgba(251,191,36,0.12);color:var(--accent-yellow)">📊</div><h4>scores</h4></div><div class="schema-fields"><div class="schema-field"><span class="fname pk">id</span><span class="ftype">UUID PK</span></div><div class="schema-field"><span class="fname fk">conversation_id</span><span class="ftype">UUID FK</span></div><div class="schema-field"><span class="fname">overall_score</span><span class="ftype">INT (0-100)</span></div><div class="schema-field"><span class="fname">sub_scores</span><span class="ftype">JSONB</span></div><div class="schema-field"><span class="fname">red_flags</span><span class="ftype">JSONB</span></div></div></div>
+      <div class="schema-card"><div class="schema-card-header"><div class="table-icon" style="background:rgba(167,139,250,0.12);color:var(--accent-purple)">📝</div><h4>audit_log</h4></div><div class="schema-fields"><div class="schema-field"><span class="fname pk">id</span><span class="ftype">UUID PK</span></div><div class="schema-field"><span class="fname">actor</span><span class="ftype">TEXT</span></div><div class="schema-field"><span class="fname">action</span><span class="ftype">TEXT</span></div><div class="schema-field"><span class="fname fk">conversation_id</span><span class="ftype">UUID FK (nullable)</span></div><div class="schema-field"><span class="fname">details</span><span class="ftype">JSONB</span></div></div></div>
+    </div>
+  </section>
+
+  <!-- 07 TECH STACK -->
+  <section>
+    <div class="section-label">07 — Tech Stack</div>
+    <div class="section-title">Built With</div>
+    <div class="stack-grid">
+      <div class="stack-item"><div class="stack-icon" style="background:rgba(79,140,255,0.12);color:var(--accent)">⚛️</div><div><div class="stack-name">Next.js 16 (React 19)</div><div class="stack-detail">Frontend + API</div></div></div>
+      <div class="stack-item"><div class="stack-icon" style="background:rgba(52,211,153,0.12);color:var(--accent-green)">🟢</div><div><div class="stack-name">Next.js API Routes</div><div class="stack-detail">Backend</div></div></div>
+      <div class="stack-item"><div class="stack-icon" style="background:rgba(255,120,73,0.12);color:var(--accent-warm)">🤖</div><div><div class="stack-name">Claude Haiku</div><div class="stack-detail">AI Chat (3.75x cheaper)</div></div></div>
+      <div class="stack-item"><div class="stack-icon" style="background:rgba(167,139,250,0.12);color:var(--accent-purple)">🧠</div><div><div class="stack-name">Claude Sonnet</div><div class="stack-detail">AI Scoring</div></div></div>
+      <div class="stack-item"><div class="stack-icon" style="background:rgba(251,191,36,0.12);color:var(--accent-yellow)">🐘</div><div><div class="stack-name">Neon PostgreSQL</div><div class="stack-detail">Database</div></div></div>
+      <div class="stack-item"><div class="stack-icon" style="background:rgba(251,113,133,0.12);color:var(--accent-rose)">📲</div><div><div class="stack-name">Pling SMS</div><div class="stack-detail">0.39–0.55 NOK/msg</div></div></div>
+      <div class="stack-item"><div class="stack-icon" style="background:rgba(79,140,255,0.12);color:var(--accent)">📅</div><div><div class="stack-name">Calendly</div><div class="stack-detail">Booking CTA</div></div></div>
+      <div class="stack-item"><div class="stack-icon" style="background:rgba(52,211,153,0.12);color:var(--accent-green)">▲</div><div><div class="stack-name">Vercel</div><div class="stack-detail">Deployment</div></div></div>
+    </div>
+  </section>
+
+  <!-- 08 API -->
+  <section>
+    <div class="section-label">08 — API Endpoints</div>
+    <div class="section-title">REST API Surface</div>
+    <h3 style="font-family:var(--font-display);font-size:1.15rem;margin:2rem 0 1rem;color:var(--accent-warm)">Public Webhooks</h3>
+    <div class="table-wrap"><table class="api-table"><thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Description</th></tr></thead><tbody>
+      <tr><td><span class="method-badge post">POST</span></td><td class="api-path">/api/leads/ingest</td><td style="font-size:0.78rem">Token / HMAC</td><td>Google Sheets webhook</td></tr>
+      <tr><td><span class="method-badge post">POST</span></td><td class="api-path">/api/channels/sms/inbound</td><td style="font-size:0.78rem">Pling / Simulator</td><td>Inbound SMS webhook</td></tr>
+    </tbody></table></div>
+    <h3 style="font-family:var(--font-display);font-size:1.15rem;margin:2rem 0 1rem;color:var(--accent)">Protected (JWT)</h3>
+    <div class="table-wrap"><table class="api-table"><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody>
+      <tr><td><span class="method-badge get">GET</span></td><td class="api-path">/api/conversations</td><td>List with filters</td></tr>
+      <tr><td><span class="method-badge get">GET</span></td><td class="api-path">/api/conversations/:id</td><td>Full conversation detail</td></tr>
+      <tr><td><span class="method-badge post">POST</span></td><td class="api-path">/api/conversations/:id/messages</td><td>PM sends message (takeover)</td></tr>
+      <tr><td><span class="method-badge patch">PATCH</span></td><td class="api-path">/api/conversations/:id/flow-state</td><td>Manual state transition</td></tr>
+      <tr><td><span class="method-badge post">POST</span></td><td class="api-path">/api/conversations/:id/score</td><td>Trigger re-scoring</td></tr>
+      <tr><td><span class="method-badge post">POST</span></td><td class="api-path">/api/conversations/:id/takeover</td><td>PM takes over (pauses AI)</td></tr>
+      <tr><td><span class="method-badge post">POST</span></td><td class="api-path">/api/conversations/:id/release</td><td>Re-enable AI</td></tr>
+      <tr><td><span class="method-badge get">GET</span></td><td class="api-path">/api/leads/attention</td><td>Attention queue</td></tr>
+    </tbody></table></div>
+  </section>
+
+  <!-- 09 METRICS -->
+  <section>
+    <div class="section-label">09 — Success Metrics</div>
+    <div class="section-title">Targets &amp; KPIs</div>
+    <div class="metrics-grid">
+      <div class="metric-card"><div class="metric-value" style="color:var(--accent)">< 60s</div><div class="metric-label">Lead response time</div></div>
+      <div class="metric-card"><div class="metric-value" style="color:var(--accent-green)">< 5%</div><div class="metric-label">False negative rate</div></div>
+      <div class="metric-card"><div class="metric-value" style="color:var(--accent-warm)">> 40%</div><div class="metric-label">Video tour watch rate</div></div>
+      <div class="metric-card"><div class="metric-value" style="color:var(--accent-purple)">> 30%</div><div class="metric-label">Calendly booking rate</div></div>
+      <div class="metric-card"><div class="metric-value" style="color:var(--accent-yellow)">> 15%</div><div class="metric-label">Soft commitment rate</div></div>
+      <div class="metric-card"><div class="metric-value" style="color:var(--accent-rose)">< 2 min</div><div class="metric-label">PM time per lead</div></div>
+      <div class="metric-card"><div class="metric-value" style="color:var(--accent)">< 11 NOK</div><div class="metric-label">SMS cost per lead</div></div>
+      <div class="metric-card"><div class="metric-value" style="color:var(--accent-green)">< 5%</div><div class="metric-label">Opt-out rate</div></div>
+      <div class="metric-card"><div class="metric-value" style="color:var(--accent-warm)">≥ 85%</div><div class="metric-label">AI answer accuracy</div></div>
+    </div>
+  </section>
+
+  <!-- 10 ROADMAP -->
+  <section>
+    <div class="section-label">10 — Delivery Roadmap</div>
+    <div class="section-title">Phased Rollout</div>
+    <div class="timeline">
+      <div class="timeline-item done"><div class="phase-tag">Phase 0</div><h4>Auth + Security Foundation</h4><p>JWT auth, webhook verification, rate limiting, audit logging, CORS lockdown.</p></div>
+      <div class="timeline-item done"><div class="phase-tag">Phase 1</div><h4>Backend Infrastructure</h4><p>Haiku/Sonnet split, channel messaging, Google Sheets ingestion, scoring gate, templated first message, listing snapshots.</p></div>
+      <div class="timeline-item done"><div class="phase-tag">Phase 2</div><h4>PM Dashboard (Strangler Pattern)</h4><p>LeadList + attention queue, ConversationThread, PMComposer + takeover controls, retire old chat UI.</p></div>
+      <div class="timeline-item done"><div class="phase-tag">Phase 3</div><h4>Scoring Refinement</h4><p>Unified LeadScoring.md with preliminary + conversation modes. Four weighted sub-scores. Behavioral signals injection.</p></div>
+      <div class="timeline-item done"><div class="phase-tag">Phase 5</div><h4>Contract Decision Guide</h4><p>25-topic SMS-ready contract quick reference (ContractGuide.md) injected into Oline's prompt. Pre-computed answers with per-topic anti-patterns.</p></div>
+      <div class="timeline-item done"><div class="phase-tag">Phase 6</div><h4>SMS Simulator via Rova</h4><p>Rova backend + UI, simulator adapter, character enforcement, debounce auto-reply, E2E test script.</p></div>
+      <div class="timeline-item"><div class="phase-tag">Phase 4</div><h4>MCP Prompt Streamlining</h4><p>Prompt caching for static sections. Eliminate static listing file dependencies.</p></div>
+    </div>
+  </section>
+
+  <!-- 11 COMPLIANCE -->
+  <section>
+    <div class="section-label">11 — Compliance &amp; Risk</div>
+    <div class="section-title">Guardrails</div>
+    <div class="two-col" style="gap:1.5rem">
+      <div>
+        <h3 style="font-family:var(--font-display);font-size:1.25rem;margin-bottom:1.25rem">Compliance</h3>
+        <div class="card" style="margin-bottom:0.75rem"><h3 style="font-size:0.92rem">SMS Consent</h3><p>Required checkbox on Google Form. No SMS without consent_sms = true.</p></div>
+        <div class="card" style="margin-bottom:0.75rem"><h3 style="font-size:0.92rem">STOP Handling</h3><p>Keyword detection, immediate suppression, logged. Checked before every send.</p></div>
+        <div class="card" style="margin-bottom:0.75rem"><h3 style="font-size:0.92rem">GDPR</h3><p>E.164 normalization. Right to deletion for Norwegian tenants.</p></div>
+        <div class="card"><h3 style="font-size:0.92rem">Audit Trail</h3><p>All PM actions, AI decisions, state transitions logged.</p></div>
+      </div>
+      <div>
+        <h3 style="font-family:var(--font-display);font-size:1.25rem;margin-bottom:1.25rem">Risk Mitigation</h3>
+        <div class="card" style="margin-bottom:0.75rem"><h3 style="font-size:0.92rem">AI Quality</h3><p>Test Haiku with 5 conversations before go-live. Sonnet fallback via env var.</p></div>
+        <div class="card" style="margin-bottom:0.75rem"><h3 style="font-size:0.92rem">Cost Control</h3><p>Pling at 0.39–0.55 NOK/msg. Budget 20 msgs/lead = NOK 8–11/lead.</p></div>
+        <div class="card" style="margin-bottom:0.75rem"><h3 style="font-size:0.92rem">Scoring False Negatives</h3><p>Filtered leads visible in dashboard. Manual override with audit logging.</p></div>
+        <div class="card"><h3 style="font-size:0.92rem">SMS Testing</h3><p>Simulator routes to Rova virtual phone. Toggle SMS_CHANNEL_MODE for zero-code switching.</p></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <div class="footer-brand">Atelier V2</div>
+  <p>Stay Management AS · PRD v2.3 · April 2, 2026 · Approved</p>
+</footer>
+
+</body>
+</html>
