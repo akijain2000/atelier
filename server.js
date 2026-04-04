@@ -35,6 +35,9 @@ const host = process.env.HOST || '0.0.0.0';
 const port = Number(process.env.PORT || 3001);
 const distPath = path.join(__dirname, 'dist');
 const listingsDir = path.join(__dirname, 'prompts', 'listings');
+const contractsDir = path.join(__dirname, 'prompts', 'contracts');
+const LEASE_CONTRACT_FILENAME = 'Leiekontrakt_2026_NORSK.md';
+const CONTRACT_GUIDE_FILENAME = 'ContractGuide.md';
 const promptCache = new Map();
 
 const replyTimers = new Map();
@@ -190,10 +193,11 @@ const authLimiter = rateLimit({
 
 // ── Helpers ──
 
-function getHealthPayload() {
+function getHealthPayload(dbStatus = null) {
   const runtime = getRuntimeConfig();
   return {
-    ok: true,
+    ok: dbStatus !== false,
+    db: dbStatus === null ? 'unchecked' : dbStatus ? 'connected' : 'error',
     ...runtime,
     promptVariants: listPromptVariants(__dirname).map(({ absolutePath, ...variant }) => variant),
   };
@@ -233,6 +237,36 @@ async function loadListingData(listingId) {
     return fenceMatch ? fenceMatch[1].trim() : raw.trim();
   } catch (err) {
     if (err.code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
+/** Full Norwegian lease template for Oline (injected as {{LEASE_CONTRACT}} in Prompt.md). */
+async function loadLeaseContract() {
+  const filePath = path.join(contractsDir, LEASE_CONTRACT_FILENAME);
+  try {
+    const raw = await fs.readFile(filePath, 'utf8');
+    return raw.trim();
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      console.warn('[prompt] Lease contract missing:', filePath);
+      return '(Leiekontrakt-fil mangler — henvis kontraktsspørsmål til tenant@stay.no.)';
+    }
+    throw err;
+  }
+}
+
+/** Pre-computed SMS-ready contract answers (injected as {{CONTRACT_GUIDE}} in Prompt.md). */
+async function loadContractGuide() {
+  const filePath = path.join(contractsDir, CONTRACT_GUIDE_FILENAME);
+  try {
+    const raw = await fs.readFile(filePath, 'utf8');
+    return raw.trim();
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      console.warn('[prompt] Contract guide missing:', filePath);
+      return '(Kontrakts-hurtigreferanse mangler — bruk fullteksten under.)';
+    }
     throw err;
   }
 }
@@ -287,6 +321,13 @@ async function buildSystemPrompt(listingId, conversation = null) {
     result = result.replace('{{FLOW_STATE}}', 'first_message_sent');
     result = result.replace('{{CALENDLY_URL}}', CALENDLY_URL);
   }
+
+  const [contractGuide, leaseContract] = await Promise.all([
+    loadContractGuide(),
+    loadLeaseContract(),
+  ]);
+  result = result.replace('{{CONTRACT_GUIDE}}', contractGuide);
+  result = result.replace('{{LEASE_CONTRACT}}', leaseContract);
 
   return result;
 }
@@ -718,8 +759,14 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
 
 // ── Routes ──
 
-app.get('/api/health', (_req, res) => {
-  res.json(getHealthPayload());
+app.get('/api/health', async (_req, res) => {
+  let dbOk = false;
+  try {
+    await db.query('SELECT 1');
+    dbOk = true;
+  } catch { /* db unreachable */ }
+  const payload = getHealthPayload(dbOk);
+  res.status(payload.ok ? 200 : 503).json(payload);
 });
 
 app.get('/api/system-prompt', requireAuth, async (req, res, next) => {
@@ -1217,6 +1264,9 @@ app.post('/api/channels/sms/inbound', (req, res, next) => {
     if (!okBasic && !okPlingHeader) {
       return res.status(401).json({ error: 'Unauthorized.' });
     }
+  } else {
+    // No Pling credentials configured and simulator secret didn't match — reject
+    return res.status(401).json({ error: 'SMS inbound not configured.' });
   }
   next();
 }, async (req, res, next) => {

@@ -21,7 +21,7 @@ export async function apiFetch(url, opts = {}) {
 
   if (res.status === 401) {
     clearToken();
-    window.location.href = '/login';
+    window.dispatchEvent(new CustomEvent('atelier:session-expired'));
     throw new Error('Session expired.');
   }
 

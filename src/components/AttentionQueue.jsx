@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../lib/auth.js';
 import FlowBadge from './FlowBadge.jsx';
@@ -12,8 +12,10 @@ const ATTENTION_STATES = [
 export default function AttentionQueue() {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState(false);
+  const [stale, setStale] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const navigate = useNavigate();
+  const hasData = useRef(false);
 
   useEffect(() => {
     loadLeads();
@@ -24,33 +26,51 @@ export default function AttentionQueue() {
   async function loadLeads() {
     try {
       const res = await apiFetch('/api/conversations');
-      if (!res.ok) { setFetchError(true); return; }
+      if (!res.ok) { if (hasData.current) { setStale(true); } return; }
       const data = await res.json();
       const filtered = (Array.isArray(data) ? data : [])
         .filter((c) => ATTENTION_STATES.includes(c.flow_state))
         .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
       setLeads(filtered);
-      setFetchError(false);
-    } catch { setFetchError(true); } finally {
+      setStale(false);
+      setLastUpdated(new Date());
+      hasData.current = true;
+    } catch {
+      if (hasData.current) setStale(true);
+    } finally {
       setLoading(false);
     }
   }
 
   if (loading) return <div className="dash-empty">Loading...</div>;
-  if (fetchError) return <div className="dash-empty">Failed to load. <button className="override-btn" onClick={loadLeads}>Retry</button></div>;
-  if (!leads.length) return <div className="dash-empty">No leads need attention right now.</div>;
+  if (!hasData.current && leads.length === 0) return <div className="dash-empty">Failed to load. <button className="override-btn" onClick={loadLeads}>Retry</button></div>;
+
+  if (!leads.length) return (
+    <div className="lead-list">
+      <h2 className="dash-heading">Attention Queue</h2>
+      <div className="empty-state">
+        <span className="empty-state-icon">✅</span>
+        <p className="empty-state-text">No leads need attention right now. All caught up!</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="lead-list">
       <h2 className="dash-heading">Attention Queue</h2>
-      <p className="dash-subheading">{leads.length} lead{leads.length !== 1 ? 's' : ''} need attention</p>
+      <p className="dash-subheading">
+        {leads.length} lead{leads.length !== 1 ? 's' : ''} need attention
+        {lastUpdated && <span style={{ marginLeft: 12, opacity: 0.7 }}>· updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+        {stale && <span className="stale-indicator" style={{ marginLeft: 12 }}>Connection issue</span>}
+      </p>
 
-      <div className="lead-table">
+      <div className="lead-table lead-table-6col">
         <div className="lead-row lead-header">
           <span>Tenant</span>
           <span>Phone</span>
           <span>Status</span>
-          <span>Score</span>
+          <span>Form</span>
+          <span>Conv.</span>
           <span>Updated</span>
         </div>
 
@@ -63,6 +83,7 @@ export default function AttentionQueue() {
             <span className="lead-phone">{lead.phone || '—'}</span>
             <span><FlowBadge state={lead.flow_state} /></span>
             <span className="lead-score">{lead.preliminary_score ?? '—'}</span>
+            <span className={`lead-score ${lead.latest_score != null ? (lead.latest_score >= 70 ? 'score-high' : lead.latest_score >= 40 ? 'score-mid' : 'score-low') : ''}`}>{lead.latest_score ?? '—'}</span>
             <span className="lead-time">{timeAgo(lead.updated_at)}</span>
           </div>
         ))}

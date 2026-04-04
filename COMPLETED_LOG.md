@@ -4,6 +4,57 @@ A running record of what was built, what decisions were made, and why. Intended 
 
 ---
 
+## Repository and hosting map (GitHub — April 2026)
+
+Data from public [GitHub API](https://api.github.com) repository records unless noted.
+
+
+| Name                             | Remote                                                                           | Branch | Homepage / deploy                                                                | Notes                                                                                                                                                                                                    |
+| -------------------------------- | -------------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Atelier (Next.js, canonical)** | [https://github.com/anubhavb11/Atelier](https://github.com/anubhavb11/Atelier)   | `main` | [https://atelier-three-ashen.vercel.app](https://atelier-three-ashen.vercel.app) | Created 2026-04-02 on GitHub; JavaScript/Next.js app — scoring revamp, dashboard, API routes land here.                                                                                                  |
+| **Atelier (legacy Vite)**        | [https://github.com/akijain2000/atelier](https://github.com/akijain2000/atelier) | `main` | *(none on GitHub)*                                                               | Public description: *Tenant chat & lead scoring platform — AI concierge + real-time scoring for property managers*. Early fork / sandbox; first deploy was documented as Render (`akijain2000/atelier`). |
+| **Rova**                         | *Not listed publicly* under `anubhavb11` / `akijain2000`                         | —      | **Render**                                                                       | Local npm name `rova-chatbot` — React 19 + Vite 7 + Express; SMS Simulator workbench + webhook to Atelier. Publish or document private URL when available.                                               |
+
+
+**Active development target for Stay outbound product:** clone [anubhavb11/Atelier](https://github.com/anubhavb11/Atelier), not the legacy repo.
+
+---
+
+## gstack UI V2 pipeline + ops hardening (2026-04-04)
+
+**Goal:** Bring the legacy Vite PM dashboard in line with PRD priorities: clearer states, safer actions, mobile shell, honest health checks, and a written UI spec for design review and porting to the Next.js canonical app.
+
+### Planning and review (gstack)
+
+1. **Design consultation** — Produced `DESIGN.md` (App UI: tokens, typography, motion, accessibility, component notes).
+2. **Authoring** — `docs/atelier-ui-v2-plan.md` defines screens, responsive behavior, IA, journey, and scope; aligned to `PRD_ATELIER.md` (workspace) / `docs/PRD_ATELIER.md` (this repo copy).
+3. **Plan design review** — Resolved open questions in the plan: Attention Queue as two logical columns (form vs conversation context), dual score presentation where relevant, **Score Now** as explicit `POST .../score`, destructive flows via **ConfirmDialog**, session expiry surfaced with a **toast** before redirect to `/login`, heading hierarchy tied to `DESIGN.md`.
+4. **Design review (live)** — Iterated `src/styles.css` and components against a running dev server; evidence captured under the local gstack project tree (e.g. `~/.gstack/projects/atelier/designs/`), not committed.
+5. **QA-only** — Structured pass with health score and repro notes under `~/.gstack/projects/atelier/qa-reports/`; no code changes in that step.
+
+### Engineering deliverables
+
+
+| Topic                    | Change                                                                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Inbound SMS**          | Reject unauthenticated inbound requests when Pling + simulator paths do not authorize the payload (`server.js`).                |
+| **Health**               | `GET /api/health` executes `SELECT 1`; body reports DB connectivity; **503** if DB unreachable.                                 |
+| **Shell / auth**         | `Dashboard.jsx`: session-expired **toast** via custom event before navigation to login; mobile **hamburger** + overlay sidebar. |
+| **Attention Queue**      | `AttentionQueue.jsx` + styles: column layout, stale indicator, relative **updated** time.                                       |
+| **Filtered leads**       | `FilteredLeads.jsx`: rows open conversation with **ConfirmDialog** where appropriate.                                           |
+| **Conversation**         | `ConversationView.jsx`: empty thread, last-updated, composer hint, **Score Now** wiring to score API.                           |
+| **Shared UI**            | New `ConfirmDialog.jsx`, `Toast.jsx`.                                                                                           |
+| **Styles**               | Dialogs, toast, empty states, responsive sidebar, `:focus-visible`, login padding (`src/styles.css`).                           |
+| **Ops docs**             | `CLAUDE.md`: Render URL and “verify in dashboard” note; always read `DESIGN.md` for UI.                                         |
+| **Product docs in repo** | `docs/atelier-ui-v2-plan.md`, `docs/PRD_ATELIER.md` (v2.4 snapshot), root `CHANGELOG.md`.                                       |
+
+
+### Product / PRD
+
+- Workspace `PRD_ATELIER.md` bumped to **v2.4** with §**1.2** (legacy UI V2 pack) and changelog line pointing at this repo’s `CHANGELOG.md`.
+
+---
+
 ## Day 1: Fork & Strip (2026-04-01)
 
 **Goal:** Fork the Rova codebase into a standalone Atelier project. Remove all prompt-studio features (evaluations, benchmarks, training). Restructure the database for multi-conversation management. Add listing data injection and conversation CRUD.
@@ -12,25 +63,25 @@ A running record of what was built, what decisions were made, and why. Intended 
 
 Before any code was written, three gstack planning tools were used:
 
-1. **`/office-hours`** — Brainstormed the product concept. Evaluated three approaches:
-   - **Approach A ("Strip & Reskin"):** Fork Rova, rebuild frontend with 3-panel layout. ~1 week. Rejected — too much UI investment before validating AI quality.
-   - **Approach B ("Clean Fork"):** Rebuild frontend from scratch, migrate to Supabase, add WebSockets. ~2-3 weeks. Rejected — over-engineering for a prototype.
-   - **Approach C ("AI-First Validation"):** Fork Rova, keep existing chat UI, add listing selector + scoring sidebar stubs. ~3 days. **Chosen** — fastest path to real feedback, validates the AI before investing in UI.
-   - Output saved to `DESIGN_ATELIER.md`.
-
-2. **`/plan-eng-review`** — Locked in 7 architecture decisions that guided all implementation:
-   - **Decision #1:** Separate `scoreLead()` function — isolated from chat flow, no changes to chatRuntime.js
-   - **Decision #2:** Proper relational schema (`conversations` + `messages` + `scores` tables) instead of JSONB blob
-   - **Decision #3:** Template listing data at request time — read prompt + listing file, replace `{{LISTING_DATA}}`
-   - **Decision #4:** Defensive JSON parsing for scoring responses — strip markdown fences, trim, retry once
-   - **Decision #5:** Extract App.jsx into ChatPanel, ConversationList, ScoringSidebar, ListingSelector + thin shell
-   - **Decision #6:** Remove hardcoded Supabase credentials, require env vars with clear error messages
-   - **Decision #7:** Async scoring — POST /score returns immediately, scoring runs in background
-   - All decisions recorded in `DESIGN_ATELIER.md` under "Engineering Review Decisions (locked)".
+1. `**/office-hours`** — Brainstormed the product concept. Evaluated three approaches:
+  - **Approach A ("Strip & Reskin"):** Fork Rova, rebuild frontend with 3-panel layout. ~1 week. Rejected — too much UI investment before validating AI quality.
+  - **Approach B ("Clean Fork"):** Rebuild frontend from scratch, migrate to Supabase, add WebSockets. ~2-3 weeks. Rejected — over-engineering for a prototype.
+  - **Approach C ("AI-First Validation"):** Fork Rova, keep existing chat UI, add listing selector + scoring sidebar stubs. ~3 days. **Chosen** — fastest path to real feedback, validates the AI before investing in UI.
+  - Output saved to `DESIGN_ATELIER.md`.
+2. `**/plan-eng-review`** — Locked in 7 architecture decisions that guided all implementation:
+  - **Decision #1:** Separate `scoreLead()` function — isolated from chat flow, no changes to chatRuntime.js
+  - **Decision #2:** Proper relational schema (`conversations` + `messages` + `scores` tables) instead of JSONB blob
+  - **Decision #3:** Template listing data at request time — read prompt + listing file, replace `{{LISTING_DATA}}`
+  - **Decision #4:** Defensive JSON parsing for scoring responses — strip markdown fences, trim, retry once
+  - **Decision #5:** Extract App.jsx into ChatPanel, ConversationList, ScoringSidebar, ListingSelector + thin shell
+  - **Decision #6:** Remove hardcoded Supabase credentials, require env vars with clear error messages
+  - **Decision #7:** Async scoring — POST /score returns immediately, scoring runs in background
+  - All decisions recorded in `DESIGN_ATELIER.md` under "Engineering Review Decisions (locked)".
 
 ### What Was Built
 
 #### 1. Repository Fork
+
 - Created `atelier/` directory alongside Rova
 - Copied only needed files: `server.js`, `lib/chatRuntime.js`, `lib/mcpClient.js`, `mcp/server.js`, `mcp/supabase.js`, `mcp/migrations/`, `src/App.jsx`, `src/styles.css`, `vite.config.js`, `index.html`, `package.json`
 - Did NOT copy: `lib/benchmarkRunner.js`, `lib/benchmarkParser.js`, `scripts/`, `akshat/`, `data/`, `analysis/`, `node_modules/`
@@ -39,7 +90,8 @@ Before any code was written, three gstack planning tools were used:
 #### 2. Backend — `server.js` (1065 → ~310 lines)
 
 **Removed (~750 lines):**
-- 3 benchmark routes (`/api/benchmark/*`)
+
+- 3 benchmark routes (`/api/benchmark/`*)
 - 1 evaluation route (`/api/evaluations`)
 - 8 training routes (`/api/training/*`) + 6 helper functions (`assertTrainingScenarioShape`, `loadTrainingScenarios`, `updateTrainingSessionStats`, `getTrainingExportRows`, `csvCell`, `rowsToCsv`)
 - `benchmarkRunner.js` import
@@ -47,12 +99,14 @@ Before any code was written, three gstack planning tools were used:
 - `hydrateEvaluationPayload` from chatRuntime import
 
 **Kept:**
+
 - `/api/health` — runtime diagnostics
 - `/api/system-prompt` (GET/PUT) — prompt management
 - `/api/chat` — legacy direct chat endpoint (backward compatibility)
 - Static file serving for production builds
 
 **Added:**
+
 - `GET /api/listings` — reads `prompts/listings/*.md`, returns `[{ id, name, file }]`
 - `GET /api/conversations` — list all conversations with latest score (LATERAL JOIN)
 - `GET /api/conversations/:id` — conversation detail with messages and latest score
@@ -80,12 +134,13 @@ Added indexes: `idx_messages_conversation` (conversation_id, created_at) and `id
 
 **Why relational instead of JSONB:** The old design stored all messages as a JSONB array in `chat_sessions.messages`. This makes querying individual messages impossible (e.g., "find all conversations where the tenant mentioned pets"), prevents efficient pagination, and couples the message schema to the session record. Normalizing into separate tables enables proper SQL queries, foreign key integrity, and independent message/score lifecycle management.
 
-#### 4. Frontend — `App.jsx` (3600 → ~140 lines) + 5 Components (~380 lines total)
+#### 4. Frontend — `App.jsx` (3600 → ~~140 lines) + 5 Components (~~380 lines total)
 
 **Removed entirely:**
+
 - `EvaluationRoundRoute` (~150 lines), `EvaluationDashboard`, `EvaluationSummaryTable`
 - `BenchmarkPage` (~175 lines), `BenchmarkSummaryTable`, `BenchmarkQuestionRow`
-- `TrainingStudioRoute` (~875 lines), `TrainingDataRoute` (~220 lines), `TrainingSessionDetailRoute` (~160 lines), `TrainingRouteTabs`
+- `TrainingStudioRoute` (~~875 lines), `TrainingDataRoute` (~~220 lines), `TrainingSessionDetailRoute` (~160 lines), `TrainingRouteTabs`
 - `ReviewList`, comparison/evaluation summary components
 - `ChatHistoryRoute`, `ChatSessionDetailRoute` (session history views)
 - `RouteNav`, `BottomNav` (multi-route navigation)
@@ -95,6 +150,7 @@ Added indexes: `idx_messages_conversation` (conversation_id, created_at) and `id
 - `formatProviderLabel`, `getProviderStatusLabel`, `getProviderHelperText`, `getRouteState`
 
 **Extracted into components (per eng review decision #5):**
+
 - `src/components/ChatPanel.jsx` — message thread + composer, adapted for tenant/admin/assistant roles
 - `src/components/ConversationList.jsx` — sidebar with conversation cards, status badges, new-conversation button
 - `src/components/MarkdownText.jsx` — inline markdown renderer (bold, italic, code, headings, lists)
@@ -102,6 +158,7 @@ Added indexes: `idx_messages_conversation` (conversation_id, created_at) and `id
 - `src/components/ScoringSidebar.jsx` — score display with tier badges, sub-scores, red flags, recommended action (populated in Day 2)
 
 **New `App.jsx` shell:**
+
 - Single-page app with 3-column layout: conversation list | chat panel | scoring sidebar
 - State: conversations list, active conversation, messages, draft, sending state, selected listing, latest score
 - Polls conversations every 15 seconds for updates
@@ -111,14 +168,14 @@ Added indexes: `idx_messages_conversation` (conversation_id, created_at) and `id
 
 #### 5. CSS — `styles.css` (complete rewrite)
 
-- Removed all eval/training/benchmark CSS classes (`.eval-*`, `.training-*`, `.bm-*`, `.comparison-*`, `.review-*`, `.workspace-stat-*`)
+- Removed all eval/training/benchmark CSS classes (`.eval-`*, `.training-*`, `.bm-*`, `.comparison-*`, `.review-*`, `.workspace-stat-*`)
 - New 3-column layout: `.atelier-layout` with `grid-template-columns: 240px 1fr 280px`
 - New component styles: `.conversation-sidebar`, `.conversation-card`, `.scoring-sidebar`, `.score-display`, `.listing-selector`
 - Responsive breakpoints: scoring sidebar hides below 1100px, conversation sidebar hides below 768px
 - Typography: Playfair Display (serif headings) + Inter (body), dark theme with gold accent (`#c4a265`)
 - Kept and adapted: `.chat-panel`, `.messages`, `.message-bubble`, `.composer`, `.primary-button`, `.ghost-button`, `.status-pill`, `.eyebrow`, `.empty-state`
 
-**Why rewrite instead of strip:** The original CSS was ~1800 lines with deep coupling to removed components. More than half the file was eval/training/benchmark styles. Stripping would have left orphaned selectors and inconsistent spacing. A clean rewrite (~470 lines) gives us exactly what we need with consistent design tokens.
+**Why rewrite instead of strip:** The original CSS was ~~1800 lines with deep coupling to removed components. More than half the file was eval/training/benchmark styles. Stripping would have left orphaned selectors and inconsistent spacing. A clean rewrite (~~470 lines) gives us exactly what we need with consistent design tokens.
 
 #### 6. Prompt & Listing Data
 
@@ -130,6 +187,7 @@ Added indexes: `idx_messages_conversation` (conversation_id, created_at) and `id
 #### 7. Security — `mcp/supabase.js` (per eng review decision #6)
 
 Removed hardcoded defaults:
+
 - `SUPABASE_URL` — was `https://rlykjjfzidjtratexipg.supabase.co`
 - `SUPABASE_ANON_KEY` — was a full JWT
 - `STAYPORTAL_EMAIL` — was `simon@stay.no`
@@ -181,6 +239,7 @@ atelier/
 ### What's Next — Day 2: Scoring Sidebar
 
 Per the implementation plan in `DESIGN_ATELIER.md`:
+
 - Implement `scoreLead()` function using the Lead Scoring prompt
 - Wire `/api/conversations/:id/score` to actually call Anthropic with conversation messages
 - Implement milestone-based scoring triggers (3+ messages, PII detection, idle timeout)
@@ -213,6 +272,7 @@ Also renamed the labels inside the prompt text itself (section headers, output f
 #### 2. `scoreLead()` Function (~80 lines)
 
 A standalone async function that:
+
 - Reads all messages for a conversation from the database
 - Loads the scoring system prompt from `prompts/LeadScoring.md` (cached after first read)
 - Formats messages as a transcript: `Tenant: "..."` / `Oline: "..."`
@@ -224,7 +284,7 @@ A standalone async function that:
 
 **Why direct Anthropic call instead of chatRuntime:** `chatRuntime.js` is designed for chat flows with MCP tool calling, multi-round conversations, and provider abstraction. Scoring is a single-shot request/response — adding tool calling overhead would slow it down and risk tool-use side effects. A direct `fetch()` to the Anthropic API is simpler, faster, and isolated.
 
-**Why retry once on parse failure:** Claude occasionally wraps JSON in markdown fences (`\`\`\`json ... \`\`\``) or adds a brief preamble despite being told not to. The defensive parser strips fences first, and if parsing still fails, retries the entire API call. This handles transient formatting issues without failing the entire scoring flow.
+**Why retry once on parse failure:** Claude occasionally wraps JSON in markdown fences (`\`json ... `) or adds a brief preamble despite being told not to. The defensive parser strips fences first, and if parsing still fails, retries the entire API call. This handles transient formatting issues without failing the entire scoring flow.
 
 #### 3. Milestone Detection — `checkScoringMilestones()` (~40 lines)
 
@@ -243,7 +303,7 @@ Guard against re-scoring: only triggers if the conversation's `message_count` is
 Replaced the Day 1 stub with real async scoring (per eng review decision #7):
 
 - **POST /conversations/:id/score** — Creates a pending score record (returns immediately with `{ status: 'pending', score_id }`)
-- **`executeScoring(conversationId, scoreId)`** — Runs `scoreLead()` in the background (not awaited). On success: updates the score row with all fields + sets `scoring_status = 'complete'`. On failure: sets `scoring_status = 'error'`.
+- `**executeScoring(conversationId, scoreId)`** — Runs `scoreLead()` in the background (not awaited). On success: updates the score row with all fields + sets `scoring_status = 'complete'`. On failure: sets `scoring_status = 'error'`.
 - **Status badge rules:** After scoring completes, updates `conversations.status`:
   - `overall_score >= 50` AND `red_flags.score === 0` → `ai_managed`
   - `overall_score < 50` OR `red_flags.score > 0` → `requires_attention`
@@ -255,6 +315,7 @@ Replaced the Day 1 stub with real async scoring (per eng review decision #7):
 #### 5. Auto-Score Trigger in POST `/messages`
 
 After the AI reply is committed, the endpoint now calls `checkScoringMilestones()`. If a milestone fires:
+
 - Inserts a pending score record
 - Kicks off `executeScoring()` in the background
 - Returns `{ autoScoreTriggered: true, scoreId }` in the response so the frontend knows to start polling
@@ -294,8 +355,8 @@ Score numbers use `font-variant-numeric: tabular-nums` for consistent width alig
 
 #### 8. App.jsx — Score Polling + Manual Trigger
 
-- **`triggerScore()`:** Calls `POST /conversations/:id/score`, sets `isScoring = true`, starts polling
-- **`startScorePolling(convoId)`:** Polls `GET /conversations/:id` every 3 seconds. When `scoring_status !== 'pending'`, stops polling, updates `latestScore`, sets `isScoring = false`, refreshes conversation list
+- `**triggerScore()`:** Calls `POST /conversations/:id/score`, sets `isScoring = true`, starts polling
+- `**startScorePolling(convoId)`:** Polls `GET /conversations/:id` every 3 seconds. When `scoring_status !== 'pending'`, stops polling, updates `latestScore`, sets `isScoring = false`, refreshes conversation list
 - **Auto-score handling:** After `sendMessage`, checks response for `autoScoreTriggered: true` and starts polling
 - **Cleanup:** Score polling interval is cleared when active conversation changes or component unmounts
 - **Props wiring:** Passes `onScore={triggerScore}` and `isScoring={isScoring}` to ScoringSidebar
@@ -320,13 +381,9 @@ New styles for the scoring UI:
 ### Architecture Decisions Made
 
 1. **Direct Anthropic API for scoring (not chatRuntime):** Scoring is a single-shot request. chatRuntime adds MCP tool calling, multi-round loop, and provider abstraction — none of which scoring needs. Direct fetch is simpler and eliminates tool-use side effects.
-
 2. **Background execution with DB status tracking:** Score status lives in the `scores` table (`pending` → `complete` | `error`). The frontend polls the conversation endpoint rather than a WebSocket. This is simpler, stateless, and works across page reloads.
-
 3. **Milestone guard via `message_count_at_scoring`:** Each score record stores how many messages existed when scoring was triggered. New milestones only fire if more messages have arrived since the last score. This prevents cascading re-scores.
-
 4. **Sub-score key renaming at two levels:** Labels are renamed both in the prompt text (so Claude outputs the correct keys) and in the backend `renameSubScoreKeys()` (as a safety net in case Claude uses the original labels). Belt and suspenders.
-
 5. **Conversation status derived from score:** `status` is updated after scoring completes, not manually set. This ensures status always reflects the latest score data. The rules are simple: score >= 50 with no red flags = AI can handle it; otherwise, requires human attention.
 
 ### Files Changed
@@ -353,15 +410,17 @@ atelier/
 
 ### Code Review Findings (7 issues found, all fixed)
 
-| # | Severity | Issue | Fix Applied |
-|---|----------|-------|-------------|
-| 1 | CRITICAL | Pending scores didn't block re-enqueue, causing duplicate API calls and wasted spend | Added `EXISTS (... scoring_status = 'pending')` short-circuit in `checkScoringMilestones()` and `POST /score` |
-| 2 | CRITICAL | IDOR on `GET /score/:scoreId`, ignoring `conversation_id` | Added `AND conversation_id = $2` to the WHERE clause |
-| 3 | CRITICAL | Weak AI output validation before DB write (no clamping, no length limits) | Added `Math.max/min` clamping for overall_score (0-100) and sub-scores (1-5), string length caps (500/1000 chars) |
-| 4 | CRITICAL | `JSON.parse` without try/catch in `ScoringSidebar.jsx` could crash the component | Added `safeParse()` helper with fallback to `{}` |
-| 5 | HIGH | `loadConversations` didn't check `res.ok`, could set state to non-array and crash `ConversationList` | Added `res.ok` check and `Array.isArray` guard |
-| 6 | INFO | Retry path in `scoreLead` didn't check `retryResponse.ok` | Added `ok` check, throws on failure |
-| 7 | INFO | `SubScoreRow` rendered `NaN%` width for undefined/out-of-range scores | Added `Number.isFinite` guard with clamping to 0-5 |
+
+| #   | Severity | Issue                                                                                                | Fix Applied                                                                                                       |
+| --- | -------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 1   | CRITICAL | Pending scores didn't block re-enqueue, causing duplicate API calls and wasted spend                 | Added `EXISTS (... scoring_status = 'pending')` short-circuit in `checkScoringMilestones()` and `POST /score`     |
+| 2   | CRITICAL | IDOR on `GET /score/:scoreId`, ignoring `conversation_id`                                            | Added `AND conversation_id = $2` to the WHERE clause                                                              |
+| 3   | CRITICAL | Weak AI output validation before DB write (no clamping, no length limits)                            | Added `Math.max/min` clamping for overall_score (0-100) and sub-scores (1-5), string length caps (500/1000 chars) |
+| 4   | CRITICAL | `JSON.parse` without try/catch in `ScoringSidebar.jsx` could crash the component                     | Added `safeParse()` helper with fallback to `{}`                                                                  |
+| 5   | HIGH     | `loadConversations` didn't check `res.ok`, could set state to non-array and crash `ConversationList` | Added `res.ok` check and `Array.isArray` guard                                                                    |
+| 6   | INFO     | Retry path in `scoreLead` didn't check `retryResponse.ok`                                            | Added `ok` check, throws on failure                                                                               |
+| 7   | INFO     | `SubScoreRow` rendered `NaN%` width for undefined/out-of-range scores                                | Added `Number.isFinite` guard with clamping to 0-5                                                                |
+
 
 ### Architectural Decisions
 
@@ -393,18 +452,21 @@ Tested the complete flow with a realistic Finn.no tenant inquiry against the liv
 
 **Test scenario:** Erik Nilsen, 28-year-old consultant at Deloitte in Bergen, inquiring about the N94 3ROMS listing.
 
-| Step | Action | Result |
-|------|--------|--------|
-| 1 | Select listing "N94 3ROMS" | Auto-populated from `/api/listings` |
-| 2 | Create conversation | Conversation created, "AI MANAGED" badge, 3-column layout rendered |
-| 3 | Send message 1 (intro with name, age, occupation) | AI responded in character as Finn concierge with exact pricing (22,600 kr/month), deposit info, property details. **PII detected → auto-score triggered.** |
-| 4 | Score result #1 | **67/100 MEDIUM** — "MONITOR — interested but needs more engagement" |
-| 5 | Send message 2 (watched video, requesting viewing) | AI forwarded viewing request, asked for email. **Auto-rescore triggered.** |
-| 6 | Score result #2 | **82/100 HIGH** — "FOLLOW UP — good lead, ensure prompt response" |
-| 7 | Send message 3 (email, employer, offer to send payslip) | AI confirmed, promised team follow-up. **Auto-rescore triggered.** |
-| 8 | Score result #3 | **88/100 HIGH** — "PRIORITIZE — high-quality lead, forward to team immediately" |
+
+| Step | Action                                                  | Result                                                                                                                                                     |
+| ---- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Select listing "N94 3ROMS"                              | Auto-populated from `/api/listings`                                                                                                                        |
+| 2    | Create conversation                                     | Conversation created, "AI MANAGED" badge, 3-column layout rendered                                                                                         |
+| 3    | Send message 1 (intro with name, age, occupation)       | AI responded in character as Finn concierge with exact pricing (22,600 kr/month), deposit info, property details. **PII detected → auto-score triggered.** |
+| 4    | Score result #1                                         | **67/100 MEDIUM** — "MONITOR — interested but needs more engagement"                                                                                       |
+| 5    | Send message 2 (watched video, requesting viewing)      | AI forwarded viewing request, asked for email. **Auto-rescore triggered.**                                                                                 |
+| 6    | Score result #2                                         | **82/100 HIGH** — "FOLLOW UP — good lead, ensure prompt response"                                                                                          |
+| 7    | Send message 3 (email, employer, offer to send payslip) | AI confirmed, promised team follow-up. **Auto-rescore triggered.**                                                                                         |
+| 8    | Score result #3                                         | **88/100 HIGH** — "PRIORITIZE — high-quality lead, forward to team immediately"                                                                            |
+
 
 **Sub-score evolution (final):**
+
 - Tenant Profile Fit: 5/5 — "28 years old, consultant at Deloitte — ideal young professional"
 - First Message Quality: 5/5 — "Excellent intro: greeting, full name, age, job, timeline, and clear question"
 - Engagement Quality: 5/5 — "High-quality progression: watched video, requested viewing, provided email and work details"
@@ -415,6 +477,7 @@ Tested the complete flow with a realistic Finn.no tenant inquiry against the liv
 **Conversation status:** `requires_attention` (correctly derived from 88 HIGH score)
 
 **Infrastructure:**
+
 - Database: Neon PostgreSQL (eu-west-2) — tables auto-created, all records persisted correctly
 - AI: Anthropic Claude claude-sonnet-4-20250514 — latency 3-7s per response, ~11k input tokens per turn
 - MCP: StayPortal MCP server connected, 10 tools available for property context lookup
@@ -432,6 +495,7 @@ Tested the complete flow with a realistic Finn.no tenant inquiry against the liv
 #### 1. Code Quality Check (`/health`)
 
 Ran a health check before shipping:
+
 - **Build:** `npm run build` passes cleanly. Vite 7.3.1, 34 modules, 991ms build time. Output: 206KB JS (65KB gzipped), 11KB CSS (2.8KB gzipped).
 - **Dependencies:** `npm audit` — 0 vulnerabilities across 226 packages.
 - **Security:** Created `.gitignore` (was missing) to exclude `.env`, `node_modules/`, `dist/`, and log files.
@@ -446,6 +510,7 @@ Ran a health check before shipping:
 #### 3. Render Deployment Configuration
 
 Created `render.yaml` for Render's Infrastructure as Code:
+
 ```yaml
 services:
   - type: web
@@ -483,11 +548,13 @@ Changed the GitHub repo visibility from public to private using `gh repo edit --
 
 Verified production health immediately after deploy:
 
-| Endpoint | HTTP | Status |
-|----------|------|--------|
-| `/` | 200 | Title: "Atelier — Tenant Chat & Lead Scoring", 3-column layout renders correctly |
-| `/api/health` | 200 | `{"ok":true, "activeProvider":"anthropic", "activeModel":"claude-sonnet-4-20250514", "hasApiKey":true}` |
-| `/api/conversations` | 200 | Returns JSON array |
+
+| Endpoint             | HTTP | Status                                                                                                  |
+| -------------------- | ---- | ------------------------------------------------------------------------------------------------------- |
+| `/`                  | 200  | Title: "Atelier — Tenant Chat & Lead Scoring", 3-column layout renders correctly                        |
+| `/api/health`        | 200  | `{"ok":true, "activeProvider":"anthropic", "activeModel":"claude-sonnet-4-20250514", "hasApiKey":true}` |
+| `/api/conversations` | 200  | Returns JSON array                                                                                      |
+
 
 Console errors from Atelier: **0**. All errors in console log were from Render dashboard pages (Apollo/Intercom), not from Atelier itself.
 
@@ -497,18 +564,20 @@ Console errors from Atelier: **0**. All errors in console log were from Render d
 
 Full security audit (daily mode, 8/10 confidence gate). 10 findings:
 
-| # | Sev | Conf | Finding |
-|---|-----|------|---------|
-| 1 | CRIT | 10/10 | No authentication on any API endpoint — all data and LLM operations accessible to anyone with the URL |
-| 2 | CRIT | 10/10 | System prompt read/write (`GET/PUT /api/system-prompt`) open to anyone — attacker can overwrite prompt |
-| 3 | HIGH | 10/10 | `/api/chat` accepts caller-controlled `systemPrompt` in request body — arbitrary prompt + your API key |
-| 4 | HIGH | 9/10 | `listing_id` path traversal — `path.join(listingsDir, listingId + '.md')` without sanitizing `..` |
-| 5 | HIGH | 9/10 | Client can set `role: 'admin'` on messages — server trusts the body value |
-| 6 | HIGH | 9/10 | No rate limits on LLM-backed routes — attacker can burn through Anthropic API budget |
-| 7 | HIGH | 9/10 | `COMPLETED_LOG.md` contains `STAYPORTAL_PASSWORD` in plaintext (tracked in git) |
-| 8 | MED | 8/10 | `/api/health` leaks runtime config (active provider, model, prompt paths) — reconnaissance vector |
-| 9 | MED | 8/10 | CORS set to `*` (any origin) — combined with no auth, allows any website to call the API |
-| 10 | MED | 8/10 | MCP tool calls influenced by tenant chat context — prompt injection could surface sensitive tool output |
+
+| #   | Sev  | Conf  | Finding                                                                                                 |
+| --- | ---- | ----- | ------------------------------------------------------------------------------------------------------- |
+| 1   | CRIT | 10/10 | No authentication on any API endpoint — all data and LLM operations accessible to anyone with the URL   |
+| 2   | CRIT | 10/10 | System prompt read/write (`GET/PUT /api/system-prompt`) open to anyone — attacker can overwrite prompt  |
+| 3   | HIGH | 10/10 | `/api/chat` accepts caller-controlled `systemPrompt` in request body — arbitrary prompt + your API key  |
+| 4   | HIGH | 9/10  | `listing_id` path traversal — `path.join(listingsDir, listingId + '.md')` without sanitizing `..`       |
+| 5   | HIGH | 9/10  | Client can set `role: 'admin'` on messages — server trusts the body value                               |
+| 6   | HIGH | 9/10  | No rate limits on LLM-backed routes — attacker can burn through Anthropic API budget                    |
+| 7   | HIGH | 9/10  | `COMPLETED_LOG.md` contains `STAYPORTAL_PASSWORD` in plaintext (tracked in git)                         |
+| 8   | MED  | 8/10  | `/api/health` leaks runtime config (active provider, model, prompt paths) — reconnaissance vector       |
+| 9   | MED  | 8/10  | CORS set to `*` (any origin) — combined with no auth, allows any website to call the API                |
+| 10  | MED  | 8/10  | MCP tool calls influenced by tenant chat context — prompt injection could surface sensitive tool output |
+
 
 **What passed:** SQL queries use parameterized `$1` placeholders (no injection). React renders safely (no `dangerouslySetInnerHTML`). Dependencies have 0 CVEs. `.env` is properly gitignored. `render.yaml` uses `sync: false` for secrets.
 
@@ -584,31 +653,38 @@ Ran full CEO + Design + Eng review pipeline with dual voices. Key outcomes:
 #### What Was Built
 
 **Frontend Authentication (`src/lib/auth.js`):**
+
 - JWT token management (localStorage) with `getToken`, `setToken`, `clearToken`
 - `apiFetch` wrapper that auto-attaches JWT and redirects to `/login` on 401
 
 **Login Page (`src/pages/Login.jsx`):**
+
 - Email/password login form, stores JWT, navigates to dashboard on success
 
 **Dashboard Layout (`src/pages/Dashboard.jsx`):**
+
 - Sidebar navigation: Attention Queue, Filtered Leads, All Conversations
 - User session management via `/api/auth/me`, logout via `/api/auth/logout`
 - Active nav link highlighting with `react-router-dom` `NavLink`
 
 **Attention Queue (`src/components/AttentionQueue.jsx`):**
+
 - Filters conversations by actionable flow states (`pending_compose`, `first_message_sent`, `has_questions`, `wants_to_rent`, `soft_commitment`, `confirmed`, `wants_physical`, `manual_intervention`)
 - Sorted by `updated_at` (most recent first)
 
 **Filtered Leads (`src/components/FilteredLeads.jsx`):**
+
 - Shows leads with `flow_state = 'filtered'`, sorted by `preliminary_score`
 - Grouped by month with section headers
 - "Push to Pipeline" button calls `POST /api/leads/:id/override` → changes state to `pending_compose`
 
 **All Conversations (`src/components/AllConversations.jsx`):**
+
 - Lists all conversations with 6-column grid (tenant, phone, status, score, messages, updated)
 - Click to navigate to conversation detail view
 
 **Conversation View (`src/pages/ConversationView.jsx`):**
+
 - Message thread: tenant (left/dark), AI/PM (right/gold) bubbles with channel and delivery status badges
 - PM composer: textarea with character count, SMS segment preview, "Send via AI" and "Send SMS" buttons
 - "Take Over" button (sets `flow_state = 'pm_takeover'`), "Re-enable AI" button (sets back to `has_questions`)
@@ -616,19 +692,23 @@ Ran full CEO + Design + Eng review pipeline with dual voices. Key outcomes:
 - Flow State card: current state badge, preliminary score, details (source, message count, created date)
 
 **Flow Badge (`src/components/FlowBadge.jsx`):**
+
 - Reusable colored badge mapping 20 flow states to labels and color classes
 
 **Routing (`src/main.jsx`):**
+
 - `react-router-dom` with `RequireAuth` wrapper for protected routes
 - Routes: `/login`, `/` (attention queue), `/filtered`, `/all`, `/conversation/:id`
 
 **Backend Addition:**
+
 - `PATCH /api/conversations/:id` endpoint for updating `flow_state` (PM takeover, re-enable AI)
 - Audit logging for all state changes
 
 #### Phase 2D: Old UI Retirement
 
 Deleted 6 dead files (old web chat sandbox components):
+
 - `App.jsx` (6KB), `ChatPanel.jsx` (4KB), `ConversationList.jsx` (3KB)
 - `ListingSelector.jsx` (1KB), `ScoringSidebar.jsx` (5KB), `MarkdownText.jsx` (2KB)
 
@@ -648,29 +728,33 @@ Comprehensive code review identified 16 issues across CRITICAL/HIGH/MEDIUM sever
 
 ### CRITICAL/HIGH Fixes
 
-| # | Issue | Fix |
-|---|-------|-----|
-| 1 | SMS inbound endpoint had no authentication | Added Basic Auth + X-Pling-Auth header verification middleware |
-| 2 | Open registration allowed anyone to create PM accounts | Gated behind `ALLOW_REGISTRATION=true` env flag (default: disabled) |
-| 3 | `loadListingData()` vulnerable to path traversal via `listing_id` | Reject any listing_id not matching `^[a-zA-Z0-9_-]+$` |
-| 4 | E.164 normalization double-prefixed numbers starting with `47` | Detect `47XXXXXXXX` pattern, only prepend `+` instead of `+47` |
-| 5 | `sendFirstMessage()` race condition on concurrent calls | Conditional `UPDATE ... WHERE flow_state = 'pending_compose' RETURNING id` |
-| 6 | `PATCH /api/conversations/:id` accepted arbitrary flow_state | Whitelist of 20 valid states, rejects everything else |
-| 7 | SMS send didn't check `consent_sms` flag | Added consent check before sending |
-| 8 | Frontend silently swallowed API errors everywhere | All views show retry buttons on failure; error states propagated |
+
+| #   | Issue                                                             | Fix                                                                        |
+| --- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| 1   | SMS inbound endpoint had no authentication                        | Added Basic Auth + X-Pling-Auth header verification middleware             |
+| 2   | Open registration allowed anyone to create PM accounts            | Gated behind `ALLOW_REGISTRATION=true` env flag (default: disabled)        |
+| 3   | `loadListingData()` vulnerable to path traversal via `listing_id` | Reject any listing_id not matching `^[a-zA-Z0-9_-]+$`                      |
+| 4   | E.164 normalization double-prefixed numbers starting with `47`    | Detect `47XXXXXXXX` pattern, only prepend `+` instead of `+47`             |
+| 5   | `sendFirstMessage()` race condition on concurrent calls           | Conditional `UPDATE ... WHERE flow_state = 'pending_compose' RETURNING id` |
+| 6   | `PATCH /api/conversations/:id` accepted arbitrary flow_state      | Whitelist of 20 valid states, rejects everything else                      |
+| 7   | SMS send didn't check `consent_sms` flag                          | Added consent check before sending                                         |
+| 8   | Frontend silently swallowed API errors everywhere                 | All views show retry buttons on failure; error states propagated           |
+
 
 ### MEDIUM Fixes
 
-| # | Issue | Fix |
-|---|-------|-----|
-| 9 | Lead ingest could fail on unique constraint race | INSERT wrapped in try/catch for `23505`, returns duplicate gracefully |
-| 10 | `scoring_status` inconsistency (`completed` vs `complete`) | Standardized to `complete` |
-| 11 | Migration errors silently swallowed | Now logs `console.warn` unless "already exists" |
-| 12 | List components had empty catch blocks | All check `res.ok` and show retry UI |
-| 13 | Destructive actions (takeover, override) had no confirmation | Added `window.confirm()` for takeover, release, and push-to-pipeline |
-| 14 | Keyboard accessibility missing on clickable rows | Added `role="button"`, `tabIndex={0}`, Enter/Space handlers |
-| 15 | HMAC verification used re-serialized JSON instead of raw body | Express `verify` callback captures raw buffer for `/api/leads/ingest` |
-| 16 | Dashboard showed blank screen while loading | Shows loading indicator; unused imports cleaned up |
+
+| #   | Issue                                                         | Fix                                                                   |
+| --- | ------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 9   | Lead ingest could fail on unique constraint race              | INSERT wrapped in try/catch for `23505`, returns duplicate gracefully |
+| 10  | `scoring_status` inconsistency (`completed` vs `complete`)    | Standardized to `complete`                                            |
+| 11  | Migration errors silently swallowed                           | Now logs `console.warn` unless "already exists"                       |
+| 12  | List components had empty catch blocks                        | All check `res.ok` and show retry UI                                  |
+| 13  | Destructive actions (takeover, override) had no confirmation  | Added `window.confirm()` for takeover, release, and push-to-pipeline  |
+| 14  | Keyboard accessibility missing on clickable rows              | Added `role="button"`, `tabIndex={0}`, Enter/Space handlers           |
+| 15  | HMAC verification used re-serialized JSON instead of raw body | Express `verify` callback captures raw buffer for `/api/leads/ingest` |
+| 16  | Dashboard showed blank screen while loading                   | Shows loading indicator; unused imports cleaned up                    |
+
 
 **Build result:** 475KB JS (135KB gzip), 10KB CSS (2.5KB gzip). Clean build.
 
@@ -685,6 +769,7 @@ Comprehensive code review identified 16 issues across CRITICAL/HIGH/MEDIUM sever
 The `scripts/google-apps-script.js` file contains the complete Apps Script code to push Google Form submissions to the Atelier backend.
 
 **Webhook tests (all passing):**
+
 - Valid HMAC-signed payload → 200, lead ingested (or duplicate detected)
 - Duplicate submission → 200 with `duplicate: true` (idempotent)
 - Bad HMAC signature → 401 "Invalid webhook signature"
@@ -693,54 +778,64 @@ The `scripts/google-apps-script.js` file contains the complete Apps Script code 
 ### Deployment Guide
 
 #### Step 1: Open Apps Script
+
 1. Open the Google Sheet linked to your Google Form
 2. Go to **Extensions → Apps Script**
 3. Delete any existing code in `Code.gs`
 4. Paste the entire contents of `scripts/google-apps-script.js`
 
 #### Step 2: Set Script Properties
+
 1. In Apps Script, click the gear icon (**Project Settings**)
 2. Scroll to **Script Properties** and add these 3 properties:
 
-| Property | Value |
-|----------|-------|
-| `ATELIER_WEBHOOK_URL` | `https://atelier-production-b43e.up.railway.app/api/leads/ingest` |
-| `ATELIER_WEBHOOK_SECRET` | Same value as `WEBHOOK_SECRET` in your Atelier `.env` |
-| `ATELIER_LISTING_ID` | `N94_3ROMS` (or the listing this form is for) |
+
+| Property                 | Value                                                             |
+| ------------------------ | ----------------------------------------------------------------- |
+| `ATELIER_WEBHOOK_URL`    | `https://atelier-production-b43e.up.railway.app/api/leads/ingest` |
+| `ATELIER_WEBHOOK_SECRET` | Same value as `WEBHOOK_SECRET` in your Atelier `.env`             |
+| `ATELIER_LISTING_ID`     | `N94_3ROMS` (or the listing this form is for)                     |
+
 
 #### Step 3: Create Form Submit Trigger
+
 1. In Apps Script, click the clock icon (**Triggers**)
 2. Click **+ Add Trigger**
 3. Configure:
-   - Function: `onFormSubmit`
-   - Event source: **From spreadsheet**
-   - Event type: **On form submit**
+  - Function: `onFormSubmit`
+  - Event source: **From spreadsheet**
+  - Event type: **On form submit**
 4. Click **Save** and authorize when prompted
 
 #### Step 4: Test
+
 1. Submit a test entry through the Google Form
 2. In Apps Script, go to **Executions** to see the log
 3. Check the Atelier PM Dashboard — the lead should appear
 
 #### Step 5: Backfill (Optional)
+
 If there are existing form responses that were submitted before the trigger was set up:
+
 1. In Apps Script, select `backfillExistingRows` from the function dropdown
 2. Click **Run**
 3. This sends all existing rows to Atelier (with idempotency — safe to run multiple times)
 
 #### Column Mapping
 
-| Column | Form Question | Field |
-|--------|---------------|-------|
-| A | Timestamp | `timestamp` |
-| B | Hva er ditt fulle navn? | `name` |
-| C | Hva er din alder? | `age` |
-| D | Hva er din e-post? | `email` |
-| E | Telefonnummer inkl landskode | `phone` |
-| F | Når ønsker du å leie i fra? | `move_in_date` |
-| G | Hva er din nåværende status? | `tenant_status` |
-| H | En kort intro/beskrivelse | `intro` |
-| I | Kjønn (valgfritt) | `gender` |
+
+| Column | Form Question                | Field           |
+| ------ | ---------------------------- | --------------- |
+| A      | Timestamp                    | `timestamp`     |
+| B      | Hva er ditt fulle navn?      | `name`          |
+| C      | Hva er din alder?            | `age`           |
+| D      | Hva er din e-post?           | `email`         |
+| E      | Telefonnummer inkl landskode | `phone`         |
+| F      | Når ønsker du å leie i fra?  | `move_in_date`  |
+| G      | Hva er din nåværende status? | `tenant_status` |
+| H      | En kort intro/beskrivelse    | `intro`         |
+| I      | Kjønn (valgfritt)            | `gender`        |
+
 
 ---
 
@@ -749,19 +844,25 @@ If there are existing form responses that were submitted before the trigger was 
 ### What Was Built
 
 #### 1. A/B Scoring Endpoint (`POST /api/conversations/:id/score-ab`)
+
 Runs the same conversation transcript through both Haiku and Sonnet in sequence, returning side-by-side results for comparison.
 
 **Test results (first run):**
-| Model | Score | Latency | Input Tokens | Output Tokens |
-|-------|-------|---------|-------------|---------------|
-| Sonnet | 25/100 | 4,896ms | 5,185 | 269 |
-| Haiku | 15/100 | 2,471ms | 5,185 | 282 |
-| **Diff** | **10 pts** | **Haiku 2x faster** | Same | Similar |
+
+
+| Model    | Score      | Latency             | Input Tokens | Output Tokens |
+| -------- | ---------- | ------------------- | ------------ | ------------- |
+| Sonnet   | 25/100     | 4,896ms             | 5,185        | 269           |
+| Haiku    | 15/100     | 2,471ms             | 5,185        | 282           |
+| **Diff** | **10 pts** | **Haiku 2x faster** | Same         | Similar       |
+
 
 **Takeaway:** Haiku is 2x faster and gives similar directional scores. 10-point difference is acceptable for monitoring but Sonnet remains more reliable for final scoring decisions.
 
 #### 2. SMS-Adapted Scoring Rubric
+
 Updated `prompts/LeadScoring.md` engagement quality section (sub-component #3):
+
 - 3-5 SMS messages is now scored as **normal** (not penalized)
 - Signal quality per message matters more than total turn count
 - Calendly/video link clicks = strong positive signal (4+)
@@ -769,13 +870,16 @@ Updated `prompts/LeadScoring.md` engagement quality section (sub-component #3):
 - Response timing (hours vs days) factored into engagement rate
 
 #### 3. Auto-Rescore on Key State Transitions
+
 When `flow_state` transitions to any of: `wants_to_rent`, `confirmed`, `booked_calendly`, `call_completed`, `soft_commitment` — the system automatically triggers a background re-score if:
+
 - No pending score exists
 - At least one tenant message is present
 
 This ensures the PM dashboard reflects the latest scoring at critical decision points.
 
 #### 4. Dual Score Display
+
 - **API**: `GET /api/conversations/:id` now returns both `latestScore` (conversation-type) and `preliminaryScore` (form-type)
 - **ConversationView sidebar**: Shows "Form Score" (preliminary) and "Conv. Score" (latest conversation score) with color coding:
   - Green (≥70): High quality
@@ -790,13 +894,16 @@ This ensures the PM dashboard reflects the latest scoring at critical decision p
 ### What Was Built
 
 #### 1. Anthropic Prompt Caching
+
 Enabled prompt caching in `lib/chatRuntime.js`:
+
 - System prompt sent as content block with `cache_control: { type: 'ephemeral' }` (Anthropic caches for 5 minutes)
 - Added `anthropic-beta: prompt-caching-2024-07-31` header
 - `buildUsage()` now tracks `cacheCreationInputTokens` and `cacheReadInputTokens`
 - Expected ~90% cost reduction on cached input tokens for repeated conversations with the same listing
 
 #### 2. Listing Snapshot Integration
+
 - `buildSystemPrompt()` now checks `conversation.listing_snapshot.listing_data` before falling back to disk file read
 - New endpoint: `POST /api/conversations/:id/refresh-snapshot` — reloads listing data from disk into the conversation's `listing_snapshot` JSONB column
 - Snapshot includes `refreshed_at` timestamp for tracking staleness
@@ -806,20 +913,54 @@ Enabled prompt caching in `lib/chatRuntime.js`:
 
 ### All V2 Phases Complete
 
-| Phase | Status | Summary |
-|-------|--------|---------|
-| Phase 0: Auth | ✅ | JWT auth, rate limiting, audit logging, CORS |
-| Phase 1A: Model Split | ✅ | Haiku for chat, Sonnet for scoring |
-| Phase 1B: Channel Layer | ✅ | SMS via Pling, channel-agnostic architecture |
-| Phase 1C: Lead Ingestion | ✅ | Google Sheets → scoring gate → pipeline |
-| Phase 1D: First Message | ✅ | Templated SMS with video + Calendly |
-| Phase 1E: Prompt Updates | ✅ | SMS context, flow states, tenant profile |
-| Phase 2: PM Dashboard | ✅ | Full dashboard with attention queue, filters, conversation view |
-| Phase 3: Scoring | ✅ | A/B endpoint, SMS rubric, auto-rescore, dual display |
-| Phase 4: MCP/Caching | ✅ | Prompt caching, listing snapshots |
-| Phase 5: Apps Script | ✅ | Webhook script ready for deployment |
-| Security Hardening | ✅ | 16 issues fixed across CRITICAL/HIGH/MEDIUM |
-| Phase 6: SMS Simulator | 📋 Planned | Virtual phone in Rova for E2E testing without SMS provider |
+
+| Phase                    | Status     | Summary                                                                                                                           |
+| ------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 0: Auth            | ✅          | JWT auth, rate limiting, audit logging, CORS                                                                                      |
+| Phase 1A: Model Split    | ✅          | Haiku for chat, Sonnet for scoring                                                                                                |
+| Phase 1B: Channel Layer  | ✅          | SMS via Pling, channel-agnostic architecture                                                                                      |
+| Phase 1C: Lead Ingestion | ✅          | Google Sheets → scoring gate → pipeline                                                                                           |
+| Phase 1D: First Message  | ✅          | Templated SMS with video + Calendly                                                                                               |
+| Phase 1E: Prompt Updates | ✅          | SMS context, flow states, tenant profile                                                                                          |
+| Phase 2: PM Dashboard    | ✅          | Full dashboard with attention queue, filters, conversation view                                                                   |
+| Phase 3: Scoring         | ✅          | Unified LeadScoring (prelim + conversation), profile/signals, SMS rubric, auto-rescore, dual display, 4 sub-scores (Apr 2 revamp) |
+| Phase 4: MCP/Caching     | ✅          | Prompt caching, listing snapshots                                                                                                 |
+| Phase 5: Apps Script     | ✅          | Webhook script ready for deployment                                                                                               |
+| Security Hardening       | ✅          | 16 issues fixed across CRITICAL/HIGH/MEDIUM                                                                                       |
+| Phase 6: SMS Simulator   | 📋 Planned | Virtual phone in Rova for E2E testing without SMS provider                                                                        |
+
+
+---
+
+## April 2, 2026: Unified scoring revamp & rubric slim-down (Next.js Atelier)
+
+**Repo:** [anubhavb11/Atelier](https://github.com/anubhavb11/Atelier) — Next.js on Vercel ([production URL](https://atelier-three-ashen.vercel.app) per GitHub homepage); webhooks / alternate hosts per env. See **Repository and hosting map** at the top of this log for Rova vs legacy Atelier.
+
+### Scoring system revamp (shipped)
+
+**Problem:** Preliminary scoring returned only a coarse score with no breakdown; conversation scoring saw only the transcript (blind to form data); `admin`/PM messages were labeled as Tenant in the scoring transcript; milestone re-scoring could be thrown off by preliminary `scores` rows; behavioral signals (video, Calendly, reply speed, `flow_state`) were not passed to the model.
+
+**Changes:**
+
+1. `**prompts/LeadScoring.md`** — Single rubric with **MODE: PRELIMINARY** (form only) and **MODE: CONVERSATION** (profile + behavioral signals + transcript). Guidance for neutral engagement/intent in preliminary mode. Explicit **Property Manager** speaker rule (do not count as tenant engagement).
+2. `**scorePreliminary`** — Uses the same system prompt as conversation scoring; returns full JSON (`overall_score`, `sub_scores`, `conversion_likelihood`, `recommended_action`, `summary`, red flags). Ingest route persists `sub_scores` on `scores` rows with `score_type = 'preliminary'`.
+3. `**scoreLead` / conversation pass** — Prepends **TENANT PROFILE** and **BEHAVIORAL SIGNALS** (computed in `computeBehavioralSignals`) before the transcript.
+4. `**buildTranscript`** — `role === 'admin'` → speaker label **Property Manager** (not Tenant).
+5. `**checkScoringMilestones`** — Last scored message count watermark uses only `**score_type = 'conversation'**` so preliminary scores never block or corrupt conversation re-scores.
+6. **Auto + manual scoring in SMS path** — Conversation scoring runs after debounced auto-reply processing (not only dashboard POST message route). Dashboard: **Score Now / Re-score** and auto-trigger when thread has enough messages but no conversation score yet.
+7. `**ConversationView`** — Shows sub-score breakdown from latest conversation score when present, otherwise from preliminary; labels source (*intake form* vs *conversation*).
+
+**Commits (main):** `ef7b73b` — *Revamp scoring system: unified sub-scores, tenant profile injection, behavioral signals*; follow-up `d437f19` — rubric slim-down (below).
+
+### Rubric slim-down (same day)
+
+**Decision:** Remove **Stay duration fit** and **Budget signals** as AI sub-scores. Duration is usually standard for the tenant mix; **budget/solvency** belongs in the **credit check** (operations), not LLM inference from SMS.
+
+**New weights (four sub-scores only):** Conversion intent 30%, Engagement 30%, First message 20%, Tenant profile fit 20%. Red-flag penalty unchanged in principle.
+
+**Files:** `LeadScoring.md`, `lib/serverUtils.js` (dropped `financial_stability` → `budget_signals` rename), `components/ConversationView.tsx` (removed two breakdown rows).
+
+**PRD:** Updated to **v2.2** — `PRD_ATELIER.md` §5.2, §5.5, Phase 3 description aligned with the above.
 
 ---
 
@@ -835,18 +976,20 @@ Pling SMS is not configured, blocking all end-to-end testing of the AI conversat
 
 **gstack /plan-eng-review completed.** 10 issues reviewed, all resolved:
 
-| # | Issue | Decision |
-|---|-------|----------|
-| 1 | Rova deployment access | Confirmed: Rova is on Render, full push and deploy access |
-| 2 | Auth mismatch (Atelier inbound expects Pling creds) | Add `X-Simulator-Secret` auth path to existing inbound handler |
-| 3 | Real-time UI updates | Polling every 3 seconds (boring technology for a dev tool) |
-| 4 | Infinite loop / race conditions | Idempotency key + replying lock + debounce timer |
-| 5 | Rova access level | Full push and deploy access confirmed |
-| 6 | Character truncation breaks URLs | Two-layer: `max_tokens` on API call + sentence-boundary truncation as safety net |
-| 7 | Rova reply payload format | Separate `parseSimulatorInbound()` in `sms.js` (not coupled to Pling format) |
-| 8 | Conversation ID tracking | Phone as natural key, `conversation_id` as optimization from last outbound |
-| 9 | No tests in plan | Single E2E test script covering critical round-trip paths |
-| 10 | Concurrent message processing | Sequential per conversation with queue (prevents context confusion) |
+
+| #   | Issue                                               | Decision                                                                         |
+| --- | --------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 1   | Rova deployment access                              | Confirmed: Rova is on Render, full push and deploy access                        |
+| 2   | Auth mismatch (Atelier inbound expects Pling creds) | Add `X-Simulator-Secret` auth path to existing inbound handler                   |
+| 3   | Real-time UI updates                                | Polling every 3 seconds (boring technology for a dev tool)                       |
+| 4   | Infinite loop / race conditions                     | Idempotency key + replying lock + debounce timer                                 |
+| 5   | Rova access level                                   | Full push and deploy access confirmed                                            |
+| 6   | Character truncation breaks URLs                    | Two-layer: `max_tokens` on API call + sentence-boundary truncation as safety net |
+| 7   | Rova reply payload format                           | Separate `parseSimulatorInbound()` in `sms.js` (not coupled to Pling format)     |
+| 8   | Conversation ID tracking                            | Phone as natural key, `conversation_id` as optimization from last outbound       |
+| 9   | No tests in plan                                    | Single E2E test script covering critical round-trip paths                        |
+| 10  | Concurrent message processing                       | Sequential per conversation with queue (prevents context confusion)              |
+
 
 ### Architecture Decision: Natural Conversation Flow
 
@@ -862,6 +1005,7 @@ Replaced rigid ping-pong auto-reply with debounce-based natural conversation flo
 ### What Will Be Built
 
 **Atelier changes:**
+
 - New `lib/channels/simulator.js` — HTTP POST adapter to Rova
 - Modified `lib/channels/sms.js` — export GSM utilities, add `parseSimulatorInbound()`
 - Modified `lib/channels/index.js` — register simulator adapter, `SMS_CHANNEL_MODE` switch
@@ -869,6 +1013,7 @@ Replaced rigid ping-pong auto-reply with debounce-based natural conversation flo
 - New env vars: `SMS_CHANNEL_MODE`, `SIMULATOR_WEBHOOK_URL`, `SIMULATOR_SECRET`, `SMS_MAX_CHARS`, `SIMULATOR_AUTO_REPLY`, `SMS_REPLY_DELAY_S`, `SMS_REPLY_MAX_WAIT_S`
 
 **Rova changes:**
+
 - New DB table: `simulated_sms` (phone, direction, body, segments, char_count, conversation_id, message_id)
 - 5 new API routes: POST (receive from Atelier), GET phones, GET thread, POST reply (forward to Atelier), DELETE clear
 - New React component: `SmsSimulator.jsx` — phone list + thread view + char/segment counter + GSM indicator
@@ -890,3 +1035,4 @@ Replaced rigid ping-pong auto-reply with debounce-based natural conversation flo
 - **Launch A + B in parallel.** No shared files.
 - **Lane C:** Integration (inbound auth + auto-reply). After A + B.
 - **Lane D:** E2E test script. After C.
+

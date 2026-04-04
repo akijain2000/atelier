@@ -4,13 +4,13 @@ Tenant chat and lead scoring platform for property managers.
 Node.js + Express backend, React 19 + Vite frontend, PostgreSQL (Neon), Anthropic Claude AI.
 
 ## Deploy Configuration (configured by /setup-deploy)
-- Platform: Render
-- Production URL: https://atelier-production-b43e.up.railway.app
+- Platform: Render (see render.yaml for blueprint)
+- Production URL: https://atelier.onrender.com (verify actual subdomain in Render dashboard)
 - Deploy workflow: auto-deploy on push to main
 - Deploy status command: HTTP health check
 - Merge method: squash
 - Project type: web app
-- Post-deploy health check: https://atelier-production-b43e.up.railway.app/api/health
+- Post-deploy health check: https://atelier.onrender.com/api/health
 
 ### Custom deploy hooks
 - Pre-merge: npm run build (verified by render.yaml buildCommand)
@@ -22,6 +22,10 @@ Node.js + Express backend, React 19 + Vite frontend, PostgreSQL (Neon), Anthropi
 
 - build: npx vite build
 - audit: npm audit
+
+## Design System
+
+Always read DESIGN.md before making UI changes. It defines the project's type (App UI), color tokens, typography, spacing, layout breakpoints, motion rules, and accessibility requirements.
 
 ## Key files
 - server.js — Express backend (API routes, scoring, MCP integration)

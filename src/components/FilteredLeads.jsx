@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../lib/auth.js';
-import FlowBadge from './FlowBadge.jsx';
+import ConfirmDialog from './ConfirmDialog.jsx';
 
 export default function FilteredLeads() {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [overriding, setOverriding] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => { loadLeads(); }, []);
 
@@ -49,12 +52,31 @@ export default function FilteredLeads() {
 
   if (loading) return <div className="dash-empty">Loading...</div>;
   if (fetchError) return <div className="dash-empty">Failed to load. <button className="override-btn" onClick={loadLeads}>Retry</button></div>;
-  if (!leads.length) return <div className="dash-empty">No filtered leads.</div>;
+
+  if (!leads.length) return (
+    <div className="lead-list">
+      <h2 className="dash-heading">Filtered Leads</h2>
+      <div className="empty-state">
+        <span className="empty-state-icon">📋</span>
+        <p className="empty-state-text">No filtered leads. All incoming leads passed the scoring threshold.</p>
+      </div>
+    </div>
+  );
 
   const groups = groupByMonth(leads);
 
   return (
     <div className="lead-list">
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        title="Push to pipeline?"
+        message="This lead will be moved into the active pipeline for follow-up."
+        confirmLabel="Push to Pipeline"
+        variant="default"
+        onConfirm={() => { const id = confirmTarget; setConfirmTarget(null); handleOverride(id); }}
+        onCancel={() => setConfirmTarget(null)}
+      />
+
       <h2 className="dash-heading">Filtered Leads</h2>
       <p className="dash-subheading">{leads.length} lead{leads.length !== 1 ? 's' : ''} below scoring threshold</p>
 
@@ -73,7 +95,7 @@ export default function FilteredLeads() {
             </div>
 
             {group.items.map((lead) => (
-              <div key={lead.id} className="lead-row">
+              <div key={lead.id} className="lead-row" role="button" tabIndex={0} onClick={() => navigate(`/conversation/${lead.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate(`/conversation/${lead.id}`); }}>
                 <span className="lead-name">{lead.tenant_name || 'Unknown'}</span>
                 <span className="lead-score">{lead.preliminary_score ?? '—'}</span>
                 <span>{lead.tenant_status || '—'}</span>
@@ -82,7 +104,7 @@ export default function FilteredLeads() {
                 <span>
                   <button
                     className="override-btn"
-                    onClick={() => { if (window.confirm('Push this lead into the pipeline?')) handleOverride(lead.id); }}
+                    onClick={(e) => { e.stopPropagation(); setConfirmTarget(lead.id); }}
                     disabled={overriding === lead.id}
                   >
                     {overriding === lead.id ? 'Sending...' : 'Push to Pipeline'}

@@ -32,7 +32,16 @@ export default function AllConversations() {
 
   if (loading) return <div className="dash-empty">Loading...</div>;
   if (fetchError) return <div className="dash-empty">Failed to load. <button className="override-btn" onClick={loadAll}>Retry</button></div>;
-  if (!conversations.length) return <div className="dash-empty">No conversations yet.</div>;
+
+  if (!conversations.length) return (
+    <div className="lead-list">
+      <h2 className="dash-heading">All Conversations</h2>
+      <div className="empty-state">
+        <span className="empty-state-icon">💬</span>
+        <p className="empty-state-text">No conversations yet. Leads will appear here once ingested.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="lead-list">
